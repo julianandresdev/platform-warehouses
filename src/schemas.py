@@ -1,17 +1,17 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
-from src.models import MovementType
 
+from pydantic import BaseModel, ConfigDict, Field
 
-# --- DTOs de Productos ---
+from models import MovementType
+
 
 class ProductCreate(BaseModel):
     sku: str
     name: str
     description: Optional[str] = None
     category: Optional[str] = None
-    unit: str = "unit"
+    unit: str
 
 
 class ProductUpdate(BaseModel):
@@ -22,32 +22,45 @@ class ProductUpdate(BaseModel):
     unit: Optional[str] = None
 
 
-class ProductResponse(ProductCreate):
+class ProductResponse(BaseModel):
     id: int
+    sku: str
+    name: str
+    description: Optional[str] = None
+    category: Optional[str] = None
+    unit: str
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
-
-# --- DTOs de Inventarios y Movimientos ---
 
 class MovementCreate(BaseModel):
     product_id: int
-    warehouse_id: str
+    warehouse_id: int = 1
     type: MovementType
-    quantity: int = Field(..., gt=0, description="Cantidad mayor a 0")
+    quantity: int = Field(gt=0)
     reference: Optional[str] = None
 
 
 class InventoryResponse(BaseModel):
     id: int
     product_id: int
-    warehouse_id: str
+    warehouse_id: int
     quantity: int
     reserved_quantity: int
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MovementResponse(BaseModel):
+    id: int
+    product_id: int
+    warehouse_id: int
+    type: MovementType
+    quantity: int
+    reference: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
