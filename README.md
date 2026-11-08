@@ -72,6 +72,9 @@ Si no existe stock suficiente, la API responde HTTP 400 y la operación se revie
 platform-warehouses/
 ├── docker-compose.yaml
 ├── .env.example
+├── docs/
+│   ├── adr/          # decisiones de arquitectura
+│   └── fases/        # avance y respuestas por fase
 └── src/
     ├── Dockerfile
     ├── app.py
@@ -125,20 +128,22 @@ docker compose up --build
 Docker Compose inicia:
 
 - PostgreSQL en el puerto 5432.
-- FastAPI en el puerto 5000.
+- FastAPI en el puerto 8000.
+
+> Se usa 8000 y no 5000 porque en macOS el Receptor AirPlay ocupa el puerto 5000 y la API queda inaccesible sin un error claro.
 
 El servicio de la API espera a que PostgreSQL esté saludable antes de iniciar.
 
 La API queda disponible en:
 
 ```text
-http://localhost:5000
+http://localhost:8000
 ```
 
 La documentación interactiva de FastAPI está disponible en:
 
 ```text
-http://localhost:5000/docs
+http://localhost:8000/docs
 ```
 
 ## Pruebas
@@ -146,7 +151,7 @@ http://localhost:5000/docs
 ### 1. Health check
 
 ```bash
-curl -i http://localhost:5000/health -w '\n'
+curl -i http://localhost:8000/health -w '\n'
 ```
 
 Respuesta esperada:
@@ -158,7 +163,7 @@ Respuesta esperada:
 ### 2. Crear producto
 
 ```bash
-curl -i -X POST http://localhost:5000/products \
+curl -i -X POST http://localhost:8000/products \
 -H "Content-Type: application/json" \
 -d '{
   "sku": "LAPTOP-001",
@@ -178,19 +183,19 @@ HTTP/1.1 201 Created
 ### 3. Listar productos
 
 ```bash
-curl -i http://localhost:5000/products -w '\n'
+curl -i http://localhost:8000/products -w '\n'
 ```
 
 ### 4. Consultar producto
 
 ```bash
-curl -i http://localhost:5000/products/1 -w '\n'
+curl -i http://localhost:8000/products/1 -w '\n'
 ```
 
 ### 5. Actualizar producto
 
 ```bash
-curl -i -X PUT http://localhost:5000/products/1 \
+curl -i -X PUT http://localhost:8000/products/1 \
 -H "Content-Type: application/json" \
 -d '{
   "name": "Laptop Lenovo ThinkPad",
@@ -201,7 +206,7 @@ curl -i -X PUT http://localhost:5000/products/1 \
 ### 6. Registrar entrada de 10 unidades
 
 ```bash
-curl -i -X POST http://localhost:5000/inventory/movements \
+curl -i -X POST http://localhost:8000/inventory/movements \
 -H "Content-Type: application/json" \
 -d '{
   "product_id": 1,
@@ -217,7 +222,7 @@ El inventario debe quedar en 10 unidades.
 ### 7. Consultar inventario
 
 ```bash
-curl -i http://localhost:5000/inventory/1 -w '\n'
+curl -i http://localhost:8000/inventory/1 -w '\n'
 ```
 
 Después del `RECEIPT` anterior debe aparecer:
@@ -229,7 +234,7 @@ Después del `RECEIPT` anterior debe aparecer:
 ### 8. Registrar salida de 4 unidades
 
 ```bash
-curl -i -X POST http://localhost:5000/inventory/movements \
+curl -i -X POST http://localhost:8000/inventory/movements \
 -H "Content-Type: application/json" \
 -d '{
   "product_id": 1,
@@ -247,7 +252,7 @@ El inventario debe pasar de 10 a 6 unidades.
 Con 6 unidades disponibles:
 
 ```bash
-curl -i -X POST http://localhost:5000/inventory/movements \
+curl -i -X POST http://localhost:8000/inventory/movements \
 -H "Content-Type: application/json" \
 -d '{
   "product_id": 1,
@@ -273,7 +278,7 @@ Después del error, el inventario debe continuar en 6 unidades.
 ### 10. Consultar historial
 
 ```bash
-curl -i http://localhost:5000/inventory/1/movements -w '\n'
+curl -i http://localhost:8000/inventory/1/movements -w '\n'
 ```
 
 El movimiento rechazado por stock insuficiente no debe aparecer en el historial.
