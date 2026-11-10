@@ -9,7 +9,11 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-engine = create_engine(DATABASE_URL, echo=True)
+# SQL en los logs solo si se pide (SQL_ECHO=true); apagado por defecto
+# para no ensuciar los logs ni afectar las pruebas de carga.
+SQL_ECHO = os.getenv("SQL_ECHO", "false").lower() == "true"
+
+engine = create_engine(DATABASE_URL, echo=SQL_ECHO)
 
 SessionLocal = sessionmaker(
     autocommit=False,

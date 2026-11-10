@@ -15,11 +15,10 @@ services:
 
   api:
     build: src/
-    container_name: api
     environment:
       DATABASE_URL: postgresql+psycopg2://admin:admin@db:5432/platform
     ports:
-      - "5000:5000"
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
