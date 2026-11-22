@@ -5,8 +5,15 @@ services:
       POSTGRES_DB: platform
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
+      # Selecciona infrastructure/sql/warehouse/seed/<WAREHOUSE_ID>.sql
+      WAREHOUSE_ID: ${WAREHOUSE_ID:-WH-001}
     ports:
       - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # schema.sql, migrations/ y seed/ se aplican con init.sh al crear el volumen
+      - ./infrastructure/sql/warehouse:/sql:ro
+      - ./infrastructure/sql/warehouse/init.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d platform"]
       interval: 5s
@@ -17,8 +24,13 @@ services:
     build: ./services/warehouse-api
     environment:
       DATABASE_URL: postgresql+psycopg2://admin:admin@db:5432/platform
+      WAREHOUSE_ID: ${WAREHOUSE_ID:-WH-001}
+      API_KEY: ${API_KEY:-dev-api-key}
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+
+volumes:
+  pgdata: {}

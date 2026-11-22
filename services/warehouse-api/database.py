@@ -31,9 +31,5 @@ def get_db():
     finally:
         db.close()
 
-
-def init_db():
-    # Importa los modelos para registrarlos en Base.metadata
-    import models
-
-    Base.metadata.create_all(bind=engine)
+# El esquema NO se crea desde Python: la fuente de verdad es
+# infrastructure/sql/warehouse/schema.sql (ver ADR-0003).

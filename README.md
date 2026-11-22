@@ -37,71 +37,104 @@ Endpoints:
 
 ### Inventario
 
-Se implementó el manejo de inventario para una bodega.
+El inventario es el de **una bodega**, la que define la variable de entorno `WAREHOUSE_ID` (texto, p. ej. `WH-001`). El cliente nunca envía el identificador de la bodega. Los productos se identifican por **SKU**.
 
 Endpoints:
 
-- `GET /inventory/{product_id}`
-- `POST /inventory/movements`
-- `GET /inventory/{product_id}/movements`
+- `GET /inventory/{sku}`: cantidad, reservada, disponible y versión.
+- `POST /inventory/movements`: registra un movimiento (`sku`, `type`, `quantity`, `reference`).
+- `GET /inventory/{sku}/movements`: historial, del más reciente al más antiguo.
 
 Los movimientos permitidos son:
 
-- `RECEIPT`: entrada de unidades al inventario.
-- `SHIPMENT`: salida de unidades del inventario.
+- `RECEIPT`: entrada de unidades (`quantity` > 0).
+- `SHIPMENT`: salida de unidades (`quantity` > 0). Se valida contra lo **disponible** (`quantity - reserved_quantity`).
+- `ADJUSTMENT`: conteo físico. Se envía la cantidad contada (`quantity` >= 0) y el movimiento guarda la **diferencia** contra el inventario (puede ser negativa). El conteo no puede quedar por debajo de lo reservado ni coincidir con el inventario actual.
 
-La cantidad de un movimiento debe ser mayor que 0.
+Cada cambio del inventario sube `version` en 1.
 
-### Control de stock
+### Seguridad
 
-Los movimientos de inventario se procesan mediante una transacción.
+Todos los endpoints, salvo `/health` y `/health/ready`, exigen el header `X-API-Key` con el valor de la variable `API_KEY`. Sin la clave, o con una incorrecta, la API responde 401. La API no arranca si `API_KEY` no está configurada.
 
-Para una salida `SHIPMENT`:
+- `GET /health`: la API está viva.
+- `GET /health/ready`: la API puede hablar con PostgreSQL (503 si no).
 
-1. Se consulta y bloquea el registro del inventario.
-2. Se verifica que exista stock suficiente.
-3. Se descuenta la cantidad.
-4. Se registra el movimiento.
+### Códigos de error
+
+| Situación | Código |
+| --- | --- |
+| Producto o inventario inexistente | 404 |
+| SKU duplicado | 409 |
+| Stock insuficiente en una salida | 409 |
+| Conteo (`ADJUSTMENT`) bajo lo reservado o sin diferencia | 409 |
+| Borrar un producto con inventario o movimientos | 409 |
+| Cuerpo inválido (p. ej. `quantity` <= 0 en una entrada) | 422 |
+| Falta o es incorrecta la API key | 401 |
+
+Se usa 409 Conflict porque la solicitud es válida pero choca con el estado actual.
+
+### Control de stock y concurrencia
+
+Los movimientos de inventario se procesan en una sola transacción:
+
+1. Se garantiza que exista la fila de inventario con `INSERT ... ON CONFLICT (product_id, warehouse_id) DO NOTHING`.
+2. Se bloquea esa fila con `SELECT ... FOR UPDATE`.
+3. Se valida la regla del movimiento (stock disponible, conteo).
+4. Se actualiza `quantity` y `version`, y se registra el movimiento.
 5. Se confirma la transacción.
 
-Si no existe stock suficiente, la API responde HTTP 400 y la operación se revierte, evitando que el inventario quede con cantidades negativas.
+Si cualquier validación falla, la transacción se revierte completa: no queda movimiento, ni cambio de stock, ni fila de inventario creada solo para el bloqueo. Dos salidas simultáneas de 6 unidades sobre un stock de 10 dan exactamente un 201 y un 409.
+
+Además, la base impone sus propias reglas (`UNIQUE (product_id, warehouse_id)`, `quantity >= 0`, `reserved_quantity` entre 0 y `quantity`, movimientos con `quantity <> 0`) como última línea de defensa. Ver `infrastructure/sql/warehouse/schema.sql`.
 
 ## Estructura principal
 
 ```text
 platform-warehouses/
 ├── docker-compose.yaml
+├── Makefile
 ├── .env.example
 ├── docs/
 │   ├── adr/          # decisiones de arquitectura
 │   └── fases/        # avance y respuestas por fase
-└── src/
-    ├── Dockerfile
-    ├── app.py
-    ├── database.py
-    ├── models.py
-    ├── schemas.py
-    ├── services.py
-    └── requirements.txt
+├── infrastructure/
+│   ├── compose/      # compose por escenario (bodegas distribuidas, batch)
+│   └── sql/warehouse/
+│       ├── schema.sql      # fuente de verdad del esquema
+│       ├── migrations/     # cambios posteriores: NNN_descripcion.sql
+│       ├── seed/           # WH-001.sql, WH-002.sql, WH-003.sql
+│       └── init.sh         # aplica lo anterior al crear la base
+├── services/
+│   └── warehouse-api/
+│       ├── Dockerfile
+│       ├── app.py
+│       ├── config.py
+│       ├── database.py
+│       ├── models.py
+│       ├── schemas.py
+│       ├── services.py
+│       └── requirements.txt
+└── tests/load/       # Locust
 ```
 
 ### Archivos principales
 
 `app.py`
 
-Contiene la aplicación FastAPI y los endpoints HTTP.
+Contiene la aplicación FastAPI, la validación de la API key y los endpoints HTTP.
+
+`config.py`
+
+Lee `WAREHOUSE_ID` y `API_KEY` del entorno.
 
 `database.py`
 
-Configura SQLAlchemy, la conexión con PostgreSQL, las sesiones y la creación inicial de las tablas.
+Configura SQLAlchemy, la conexión con PostgreSQL y las sesiones. **No crea tablas**: el esquema lo aplica PostgreSQL desde `schema.sql`.
 
 `models.py`
 
-Contiene los modelos SQLAlchemy:
-
-- Product
-- Inventory
-- InventoryMovement
+Contiene los modelos SQLAlchemy (Product, Inventory, InventoryMovement). Reflejan `schema.sql`; si cambia una tabla se cambia primero el SQL.
 
 `schemas.py`
 
@@ -109,13 +142,13 @@ Contiene los modelos Pydantic utilizados para validar las solicitudes y respuest
 
 `services.py`
 
-Contiene la lógica de negocio, incluyendo:
+Contiene la lógica de negocio: CRUD de productos, consulta de inventario, historial y procesamiento transaccional de movimientos.
 
-- CRUD de productos.
-- Consulta de inventario.
-- Historial de movimientos.
-- Procesamiento transaccional de entradas y salidas.
-- Validación de stock.
+### Esquema de la base de datos
+
+`schema.sql` es la única fuente del esquema. PostgreSQL lo ejecuta, junto con `migrations/*.sql` y `seed/<WAREHOUSE_ID>.sql`, **solo cuando el volumen de datos está vacío** (`init.sh`). Para aplicar un cambio en esos archivos hay que recrear la base con `make reset-db` (borra los datos locales). Los cambios posteriores al esquema inicial van como `migrations/NNN_descripcion.sql`.
+
+La semilla carga el mismo catálogo de 10 productos (`P-001` a `P-010`) en cada bodega, con stock distinto (por ejemplo `P-001`: 100 en WH-001, 20 en WH-002).
 
 ## Ejecución
 
@@ -127,8 +160,10 @@ docker compose up --build
 
 Docker Compose inicia:
 
-- PostgreSQL en el puerto 5432.
+- PostgreSQL en el puerto 5432, con el esquema y la semilla de `WH-001` ya aplicados.
 - FastAPI en el puerto 8000.
+
+Variables de entorno (ver `.env.example`): `WAREHOUSE_ID` (por defecto `WH-001`) y `API_KEY` (por defecto `dev-api-key` en desarrollo).
 
 > Se usa 8000 y no 5000 porque en macOS el Receptor AirPlay ocupa el puerto 5000 y la API queda inaccesible sin un error claro.
 
@@ -148,10 +183,17 @@ http://localhost:8000/docs
 
 ## Pruebas
 
+Los ejemplos usan la clave de desarrollo. Para no repetirla:
+
+```bash
+export KEY='X-API-Key: dev-api-key'
+```
+
 ### 1. Health check
 
 ```bash
 curl -i http://localhost:8000/health -w '\n'
+curl -i http://localhost:8000/health/ready -w '\n'
 ```
 
 Respuesta esperada:
@@ -160,10 +202,18 @@ Respuesta esperada:
 {"status":"ok"}
 ```
 
-### 2. Crear producto
+### 2. Sin API key
 
 ```bash
-curl -i -X POST http://localhost:8000/products \
+curl -i http://localhost:8000/products -w '\n'
+```
+
+Respuesta esperada: `HTTP/1.1 401 Unauthorized`.
+
+### 3. Crear producto
+
+```bash
+curl -i -X POST http://localhost:8000/products -H "$KEY" \
 -H "Content-Type: application/json" \
 -d '{
   "sku": "LAPTOP-001",
@@ -174,28 +224,21 @@ curl -i -X POST http://localhost:8000/products \
 }' -w '\n'
 ```
 
-Respuesta esperada:
+Respuesta esperada: `HTTP/1.1 201 Created`. Si se repite, `HTTP/1.1 409 Conflict` (SKU duplicado).
 
-```text
-HTTP/1.1 201 Created
-```
-
-### 3. Listar productos
+### 4. Listar y consultar productos
 
 ```bash
-curl -i http://localhost:8000/products -w '\n'
+curl -i http://localhost:8000/products -H "$KEY" -w '\n'
+curl -i http://localhost:8000/products/11 -H "$KEY" -w '\n'
 ```
 
-### 4. Consultar producto
-
-```bash
-curl -i http://localhost:8000/products/1 -w '\n'
-```
+Los productos `P-001` a `P-010` vienen de la semilla, así que `LAPTOP-001` es el id 11.
 
 ### 5. Actualizar producto
 
 ```bash
-curl -i -X PUT http://localhost:8000/products/1 \
+curl -i -X PUT http://localhost:8000/products/11 -H "$KEY" \
 -H "Content-Type: application/json" \
 -d '{
   "name": "Laptop Lenovo ThinkPad",
@@ -206,11 +249,10 @@ curl -i -X PUT http://localhost:8000/products/1 \
 ### 6. Registrar entrada de 10 unidades
 
 ```bash
-curl -i -X POST http://localhost:8000/inventory/movements \
+curl -i -X POST http://localhost:8000/inventory/movements -H "$KEY" \
 -H "Content-Type: application/json" \
 -d '{
-  "product_id": 1,
-  "warehouse_id": 1,
+  "sku": "LAPTOP-001",
   "type": "RECEIPT",
   "quantity": 10,
   "reference": "ENTRADA-001"
@@ -222,41 +264,39 @@ El inventario debe quedar en 10 unidades.
 ### 7. Consultar inventario
 
 ```bash
-curl -i http://localhost:8000/inventory/1 -w '\n'
+curl -i http://localhost:8000/inventory/LAPTOP-001 -H "$KEY" -w '\n'
 ```
 
 Después del `RECEIPT` anterior debe aparecer:
 
 ```json
-"quantity": 10
+"quantity": 10, "available_quantity": 10, "version": 1
 ```
 
 ### 8. Registrar salida de 4 unidades
 
 ```bash
-curl -i -X POST http://localhost:8000/inventory/movements \
+curl -i -X POST http://localhost:8000/inventory/movements -H "$KEY" \
 -H "Content-Type: application/json" \
 -d '{
-  "product_id": 1,
-  "warehouse_id": 1,
+  "sku": "LAPTOP-001",
   "type": "SHIPMENT",
   "quantity": 4,
   "reference": "SALIDA-001"
 }' -w '\n'
 ```
 
-El inventario debe pasar de 10 a 6 unidades.
+El inventario debe pasar de 10 a 6 unidades (`version` 2).
 
 ### 9. Probar stock insuficiente
 
 Con 6 unidades disponibles:
 
 ```bash
-curl -i -X POST http://localhost:8000/inventory/movements \
+curl -i -X POST http://localhost:8000/inventory/movements -H "$KEY" \
 -H "Content-Type: application/json" \
 -d '{
-  "product_id": 1,
-  "warehouse_id": 1,
+  "sku": "LAPTOP-001",
   "type": "SHIPMENT",
   "quantity": 15,
   "reference": "SALIDA-INVALIDA-001"
@@ -266,22 +306,45 @@ curl -i -X POST http://localhost:8000/inventory/movements \
 Respuesta esperada:
 
 ```text
-HTTP/1.1 400 Bad Request
+HTTP/1.1 409 Conflict
 ```
 
 ```json
 {"detail":"Stock insuficiente para realizar la salida"}
 ```
 
-Después del error, el inventario debe continuar en 6 unidades.
+Después del error, el inventario debe continuar en 6 unidades y el movimiento rechazado no debe aparecer en el historial.
 
-### 10. Consultar historial
+### 10. Conteo físico (`ADJUSTMENT`)
+
+Se cuentan 5 unidades en la bodega:
 
 ```bash
-curl -i http://localhost:8000/inventory/1/movements -w '\n'
+curl -i -X POST http://localhost:8000/inventory/movements -H "$KEY" \
+-H "Content-Type: application/json" \
+-d '{
+  "sku": "LAPTOP-001",
+  "type": "ADJUSTMENT",
+  "quantity": 5,
+  "reference": "CONTEO-001"
+}' -w '\n'
 ```
 
-El movimiento rechazado por stock insuficiente no debe aparecer en el historial.
+El movimiento queda con `"quantity": -1` (la diferencia) y el inventario en 5.
+
+### 11. Consultar historial
+
+```bash
+curl -i http://localhost:8000/inventory/LAPTOP-001/movements -H "$KEY" -w '\n'
+```
+
+### 12. Borrar un producto con movimientos
+
+```bash
+curl -i -X DELETE http://localhost:8000/products/11 -H "$KEY" -w '\n'
+```
+
+Respuesta esperada: `HTTP/1.1 409 Conflict`.
 
 ## Verificar PostgreSQL
 
@@ -309,13 +372,13 @@ docker compose exec db psql -U admin -d platform -c "SELECT * FROM inventory_mov
 docker compose down
 ```
 
-Para eliminar también los volúmenes y reiniciar completamente la base de datos:
+Para eliminar también los volúmenes y recrear la base (esquema y semilla incluidos), **borrando los datos locales**:
 
 ```bash
-docker compose down -v
+make reset-db
 ```
 
-## Estado del Sprint 0
+## Estado del Sprint 0 (histórico)
 
 Se verificó correctamente:
 

@@ -16,13 +16,15 @@ x-api: &api
     timeout: 4s
     retries: 5
 
+x-db-env: &db-env
+  POSTGRES_DB: platform
+  POSTGRES_USER: admin
+  POSTGRES_PASSWORD: ${DB_PASSWORD:-localdev}
+  TZ: UTC
+
 x-db: &db
   image: postgres:16-alpine
-  environment:
-    POSTGRES_DB: platform
-    POSTGRES_USER: admin
-    POSTGRES_PASSWORD: ${DB_PASSWORD:-localdev}
-    TZ: UTC
+  environment: *db-env
   restart: unless-stopped
   healthcheck:
     test: ["CMD-SHELL", "pg_isready -U admin -d platform"]
@@ -42,7 +44,13 @@ x-redis: &redis
 services:
   wh001_db:
     <<: *db
-    volumes: [wh001_pg:/var/lib/postgresql/data]
+    environment:
+      <<: *db-env
+      WAREHOUSE_ID: WH-001
+    volumes:
+      - wh001_pg:/var/lib/postgresql/data
+      - ../sql/warehouse:/sql:ro
+      - ../sql/warehouse/init.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
     networks: [wh001]
   wh001_redis:
     <<: *redis
@@ -51,6 +59,7 @@ services:
     <<: *api
     environment:
       WAREHOUSE_ID: WH-001
+      API_KEY: ${API_KEY:-dev-api-key}
       DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh001_db:5432/platform
       REDIS_URL: redis://wh001_redis:6379/0
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
@@ -62,7 +71,13 @@ services:
 
   wh002_db:
     <<: *db
-    volumes: [wh002_pg:/var/lib/postgresql/data]
+    environment:
+      <<: *db-env
+      WAREHOUSE_ID: WH-002
+    volumes:
+      - wh002_pg:/var/lib/postgresql/data
+      - ../sql/warehouse:/sql:ro
+      - ../sql/warehouse/init.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
     networks: [wh002]
   wh002_redis:
     <<: *redis
@@ -71,6 +86,7 @@ services:
     <<: *api
     environment:
       WAREHOUSE_ID: WH-002
+      API_KEY: ${API_KEY:-dev-api-key}
       DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh002_db:5432/platform
       REDIS_URL: redis://wh002_redis:6379/0
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
@@ -82,7 +98,13 @@ services:
 
   wh003_db:
     <<: *db
-    volumes: [wh003_pg:/var/lib/postgresql/data]
+    environment:
+      <<: *db-env
+      WAREHOUSE_ID: WH-003
+    volumes:
+      - wh003_pg:/var/lib/postgresql/data
+      - ../sql/warehouse:/sql:ro
+      - ../sql/warehouse/init.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
     networks: [wh003]
   wh003_redis:
     <<: *redis
@@ -91,6 +113,7 @@ services:
     <<: *api
     environment:
       WAREHOUSE_ID: WH-003
+      API_KEY: ${API_KEY:-dev-api-key}
       DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh003_db:5432/platform
       REDIS_URL: redis://wh003_redis:6379/0
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/

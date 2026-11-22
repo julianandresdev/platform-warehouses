@@ -5,22 +5,25 @@ Líder: Julian · Apoyo: Esteban
 ## Qué se construyó
 
 - `docker-compose.yaml`: levanta PostgreSQL 16 y la API; la API espera a que la base esté saludable.
-- `Dockerfile`: imagen de la API (Python 3.12, uvicorn en el puerto 8000).
-- API en FastAPI: CRUD de productos con SKU único, consulta de inventario y movimientos `RECEIPT` / `SHIPMENT`.
-- Los movimientos se procesan en una transacción con `SELECT ... FOR UPDATE` para que el stock nunca quede negativo.
-- `.env.example`: variables de entorno (`DATABASE_URL`, `SQL_ECHO`).
-- `requirements.txt`: todas las dependencias de la API.
+- `Dockerfile`: imagen de la API (Python 3.12, uvicorn en el puerto 8000). Una sola imagen para todas las bodegas, configurada por variables de entorno.
+- API en FastAPI: CRUD de productos con SKU único, inventario por SKU y movimientos `RECEIPT`, `SHIPMENT` y `ADJUSTMENT`.
+- `infrastructure/sql/warehouse/schema.sql`: fuente de verdad del esquema, con las reglas de negocio como restricciones. Se aplica junto con `migrations/` y `seed/<WAREHOUSE_ID>.sql` al crear la base (`init.sh`). Ya no existe `create_all`.
+- `WAREHOUSE_ID` (texto, `WH-001`) viene del entorno; el cliente no lo envía.
+- Los movimientos se procesan en una transacción con `INSERT ... ON CONFLICT DO NOTHING` y `SELECT ... FOR UPDATE`.
+- Autenticación con `X-API-Key` (todo menos `/health` y `/health/ready`).
+- `.env.example`: variables de entorno (`DATABASE_URL`, `SQL_ECHO`, `WAREHOUSE_ID`, `API_KEY`).
 
-## Pendiente para cerrar la fase
+## Cierre de la fase
 
-- [ ] `schema.sql` como fuente de verdad (montado en `/docker-entrypoint-initdb.d/`), sin `create_all`.
-- [ ] `UNIQUE (product_id, warehouse_id)` en `inventory` e `INSERT ... ON CONFLICT DO NOTHING` antes del bloqueo.
-- [ ] `CHECK` de cantidades en la base.
-- [ ] `WAREHOUSE_ID` de tipo texto (`WH-001`) leído del entorno, no del body.
-- [ ] 409 para stock insuficiente, SKU duplicado y DELETE de un producto con movimientos.
-- [ ] Tipo de movimiento `ADJUSTMENT`.
-- [ ] Pruebas unitarias y de integración (incluida la de 2 salidas concurrentes de 6 sobre stock 10).
-- [ ] Colección `.http` con las pruebas del README.
+- [x] `schema.sql` como fuente de verdad (montado en `/docker-entrypoint-initdb.d/`), sin `create_all`.
+- [x] `UNIQUE (product_id, warehouse_id)` en `inventory` e `INSERT ... ON CONFLICT DO NOTHING` antes del bloqueo.
+- [x] `CHECK` de cantidades en la base.
+- [x] `WAREHOUSE_ID` de tipo texto (`WH-001`) leído del entorno, no del body.
+- [x] 409 para stock insuficiente, SKU duplicado y DELETE de un producto con movimientos.
+- [x] Tipo de movimiento `ADJUSTMENT` (conteo físico).
+- [x] Salidas validadas contra el disponible (`quantity - reserved_quantity`), columna `version`, inventario por SKU, API key y `/health/ready`.
+- [ ] Pruebas unitarias y de integración automatizadas (incluida la de 2 salidas concurrentes de 6 sobre stock 10): issue E-02 (#32).
+- [ ] Colección `.http` con las pruebas del README: issue E-02 (#32).
 
 ## Decisiones
 
@@ -28,12 +31,38 @@ Líder: Julian · Apoyo: Esteban
 | --- | --- | --- |
 | Puerto de la API | 8000 | En macOS el Receptor AirPlay ocupa el 5000 |
 | Tipo de `warehouse_id` | Texto (`WH-001`) | Coincide con el enunciado, las llaves de Redis y las routing keys de RabbitMQ |
-| DELETE de producto con movimientos | 409 Conflict | Más simple que el borrado lógico y no complica el SKU único |
+| Errores de conflicto | 409 Conflict | La solicitud es válida pero choca con el estado actual (stock, SKU, referencias) |
+| DELETE de producto con movimientos | 409 Conflict (FK `RESTRICT`) | Más simple que el borrado lógico y no complica el SKU único |
+| Fuente del esquema | `schema.sql` | Ver [ADR-0003](../adr/0003-schema-sql-como-fuente-de-verdad.md) |
+| Concurrencia | `ON CONFLICT` + `FOR UPDATE` | Ver [ADR-0004](../adr/0004-control-de-concurrencia-en-movimientos.md) |
+| Framework | FastAPI | Ver [ADR-0001](../adr/0001-fastapi-como-framework.md) |
+| `ADJUSTMENT` | Conteo físico: se envía lo contado y se guarda la diferencia | Refleja lo que hace un inventario real; el historial conserva el cambio, positivo o negativo |
 
 ## Preguntas del profesor
 
-<!-- Responder cada pregunta del enunciado de la Fase 1 con evidencia (capturas, logs, salidas de pruebas). -->
+### ¿Qué información es estado?
+
+El estado es lo que cambia con las operaciones y de lo que dependen las decisiones: la cantidad en `inventory` (`quantity`, `reserved_quantity` y su `version`). El catálogo de `products` cambia poco; los movimientos son historia.
+
+### ¿Qué información debe persistir?
+
+Todo lo anterior: productos, inventario y movimientos. El inventario puede reconstruirse a partir de los movimientos (auditoría), pero se guarda aparte para leerlo rápido. Debe persistir en PostgreSQL con volumen propio: la API no guarda nada crítico en memoria, así que se puede reiniciar o replicar sin perder datos. Una caché (Fase 2) nunca es la fuente de verdad.
+
+### ¿Por qué una salida necesita una transacción?
+
+Una salida hace dos escrituras que deben ocurrir juntas o ninguna: descontar `inventory.quantity` e insertar el movimiento. Sin transacción, un fallo entre ambas deja stock descontado sin historial (o historial sin descuento). Con la transacción, cualquier error —stock insuficiente, base caída— hace `ROLLBACK` y no queda rastro: ni movimiento, ni cambio de stock, ni la fila de inventario creada para el bloqueo.
+
+### ¿Qué sucede con dos salidas concurrentes?
+
+Con stock 10 y dos salidas simultáneas de 6, el `SELECT ... FOR UPDATE` bloquea la fila de inventario: la segunda transacción espera, lee el stock ya actualizado (4) y se rechaza con 409. Resultado: un 201, un 409 y stock final 4. Para la primera entrada de un producto (sin fila que bloquear), `INSERT ... ON CONFLICT DO NOTHING` sobre `UNIQUE (product_id, warehouse_id)` evita que dos peticiones creen dos filas. Detalle en [ADR-0004](../adr/0004-control-de-concurrencia-en-movimientos.md).
 
 ## Evidencia
 
-<!-- Capturas, salidas de pytest, logs. -->
+Verificación manual del cierre (PostgreSQL 18 local, API real, sin mocks):
+
+- 20 rondas de 2 salidas simultáneas de 6 sobre stock 10: en las 20, un 201, un 409 y stock final 4.
+- 20 rondas de 4 primeras entradas simultáneas de 5 unidades: en las 20, una sola fila de inventario, cantidad 20 y `version` 4.
+- Salida mayor al stock: 409 y el conteo de movimientos no cambia.
+- `CHECK` y `UNIQUE` rechazan escrituras directas en la base que violan las reglas.
+
+La evidencia automatizada (pytest en CI y colección `.http`) llega con E-02 (#32).
