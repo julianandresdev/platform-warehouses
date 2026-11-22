@@ -3,7 +3,8 @@
 # Misma imagen de API para todas las bodegas. Las variables se obtienen del entorno.
 x-api: &api
   build:
-    context: ../../services/warehouse-api
+    context: ../../services
+    dockerfile: warehouse-api/Dockerfile
   environment:
     DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@db:5432/platform
     REDIS_URL: redis://redis:6379/0
