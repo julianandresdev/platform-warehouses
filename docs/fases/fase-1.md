@@ -66,3 +66,18 @@ Verificación manual del cierre (PostgreSQL 18 local, API real, sin mocks):
 - `CHECK` y `UNIQUE` rechazan escrituras directas en la base que violan las reglas.
 
 La evidencia automatizada (pytest en CI y colección `.http`) llega con E-02 (#32).
+
+## J-03 — `services/common`: sobre de eventos, correlation ID y logs JSON
+
+- `common/events.py`: `EventEnvelope` (Pydantic) y `new_event()` según `docs/events.md`; `occurred_at` en UTC con `Z` y sin fracciones.
+- `common/correlation.py`: `ContextVar` + `CorrelationIdMiddleware` (ASGI puro). Lee `X-Correlation-ID` o genera `COR-YYYYMMDD-<8 hex>` y lo devuelve en la respuesta.
+- `common/logging.py`: logs JSON por stdout (`timestamp`, `service`, `warehouse_id`, `level`, `event`, `correlation_id` + extras), sin dependencias externas. Nivel con `LOG_LEVEL`.
+- `common/errors.py`: `TransientError` y `PermanentError` para los consumidores (F10).
+- La Warehouse API registra una línea `request` por llamada (método, ruta, status, `duration_ms`) y desactiva el access log de uvicorn.
+- Pruebas: `pip install -r requirements-dev.txt && pytest tests/unit`.
+
+Ejemplo (request con `X-Correlation-ID: COR-TEST`):
+
+```json
+{"timestamp": "2026-11-22T23:09:23.395Z", "service": "warehouse-api", "warehouse_id": "WH-001", "level": "INFO", "event": "request", "correlation_id": "COR-TEST", "method": "GET", "path": "/health", "status": 200, "duration_ms": 1.69}
+```
