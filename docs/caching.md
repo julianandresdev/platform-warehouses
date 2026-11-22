@@ -1,0 +1,41 @@
+# Caché de inventario
+
+Cache Aside sobre Redis para `GET /inventory/{sku}`. Decisión y alternativas en [ADR-0008](adr/0008-cache-aside-con-redis.md).
+
+## Funcionamiento
+
+| Paso | Qué ocurre |
+| --- | --- |
+| Lectura, hit | Se devuelve el JSON de Redis. `X-Cache: HIT`. |
+| Lectura, miss | Se lee PostgreSQL, se guarda con TTL 30 s. `X-Cache: MISS`. |
+| Movimiento (RECEIPT, SHIPMENT, ADJUSTMENT) | Commit en PostgreSQL y después `DEL` de la llave. |
+| Redis caído o caché apagada | Se responde desde PostgreSQL. `X-Cache: BYPASS`. |
+
+Llave: `warehouse:{WAREHOUSE_ID}:inventory:{sku}`.
+
+## Configuración
+
+| Variable | Default | Uso |
+| --- | --- | --- |
+| `REDIS_URL` | vacío | URL de Redis; sin ella no hay caché. |
+| `CACHE_ENABLED` | `true` | `false` apaga la caché. |
+| `CACHE_TTL_SECONDS` | `30` | Vida de cada llave. |
+| `REDIS_TIMEOUT_SECONDS` | `0.2` | Timeout de conexión y de operación. |
+
+Con `docker compose`, Redis es el servicio `redis` y no tiene persistencia (es solo caché).
+
+## Métricas
+
+`GET /metrics` (sin API key, como `/health`) expone `cache_hits_total` y `cache_misses_total`. Los `BYPASS` no cuentan en ninguno.
+
+## Cómo comprobarlo
+
+```bash
+docker compose up -d --build
+curl -i -H "X-API-Key: dev-api-key" localhost:8000/inventory/P-001   # MISS
+curl -i -H "X-API-Key: dev-api-key" localhost:8000/inventory/P-001   # HIT
+docker compose stop redis
+curl -i -H "X-API-Key: dev-api-key" localhost:8000/inventory/P-001   # 200, BYPASS
+```
+
+Con `CACHE_ENABLED=false docker compose up -d api` todas las lecturas salen `BYPASS` (base para el experimento de J-06).
