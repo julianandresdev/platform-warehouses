@@ -1,4 +1,6 @@
+import logging
 import secrets
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Response, status
@@ -8,7 +10,12 @@ from sqlalchemy.orm import Session
 import config
 import schemas
 import services
+from common.correlation import CorrelationIdMiddleware
+from common.logging import configure_logging
 from database import get_db
+
+configure_logging("warehouse-api", config.WAREHOUSE_ID, config.LOG_LEVEL)
+logger = logging.getLogger("warehouse-api")
 
 
 @asynccontextmanager
@@ -21,6 +28,27 @@ app = FastAPI(
     title="Warehouse Cloud Platform",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def log_requests(request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    logger.info(
+        "request",
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "status": response.status_code,
+            "duration_ms": round((time.perf_counter() - start) * 1000, 2),
+        },
+    )
+    return response
+
+
+# Se agrega al final para que sea la capa más externa: el correlation ID ya está
+# fijado cuando corre el log de arriba.
+app.add_middleware(CorrelationIdMiddleware)
 
 
 def require_api_key(x_api_key: str | None = Header(default=None)):
