@@ -1,25 +1,25 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from models import MovementType
 
 
 class ProductCreate(BaseModel):
-    sku: str
-    name: str
+    sku: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=200)
     description: Optional[str] = None
-    category: Optional[str] = None
-    unit: str
+    category: Optional[str] = Field(default=None, max_length=100)
+    unit: str = Field(min_length=1, max_length=50)
 
 
 class ProductUpdate(BaseModel):
-    sku: Optional[str] = None
-    name: Optional[str] = None
+    sku: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
     description: Optional[str] = None
-    category: Optional[str] = None
-    unit: Optional[str] = None
+    category: Optional[str] = Field(default=None, max_length=100)
+    unit: Optional[str] = Field(default=None, min_length=1, max_length=50)
 
 
 class ProductResponse(BaseModel):
@@ -36,19 +36,34 @@ class ProductResponse(BaseModel):
 
 
 class MovementCreate(BaseModel):
-    product_id: int
-    warehouse_id: int = 1
+    """Movimiento de inventario de ESTA bodega (la define WAREHOUSE_ID).
+
+    - RECEIPT / SHIPMENT: `quantity` son las unidades que entran o salen (> 0).
+    - ADJUSTMENT: conteo físico. `quantity` es la cantidad contada (>= 0); el
+      movimiento registrado guarda la diferencia contra el inventario.
+    """
+
+    sku: str = Field(min_length=1, max_length=100)
     type: MovementType
-    quantity: int = Field(gt=0)
-    reference: Optional[str] = None
+    quantity: int = Field(ge=0)
+    reference: Optional[str] = Field(default=None, max_length=255)
+
+    @model_validator(mode="after")
+    def quantity_must_be_positive_unless_adjustment(self):
+        if self.type != MovementType.ADJUSTMENT and self.quantity <= 0:
+            raise ValueError("quantity debe ser mayor que 0")
+        return self
 
 
 class InventoryResponse(BaseModel):
     id: int
+    sku: str
     product_id: int
-    warehouse_id: int
+    warehouse_id: str
     quantity: int
     reserved_quantity: int
+    available_quantity: int
+    version: int
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -56,8 +71,9 @@ class InventoryResponse(BaseModel):
 
 class MovementResponse(BaseModel):
     id: int
+    sku: str
     product_id: int
-    warehouse_id: int
+    warehouse_id: str
     type: MovementType
     quantity: int
     reference: Optional[str] = None

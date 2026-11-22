@@ -1,16 +1,19 @@
+import secrets
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, Response, status
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Response, status
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+import config
 import schemas
 import services
-from database import get_db, init_db
+from database import get_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    config.validate_settings()
     yield
 
 
@@ -18,6 +21,21 @@ app = FastAPI(
     title="Warehouse Cloud Platform",
     lifespan=lifespan,
 )
+
+
+def require_api_key(x_api_key: str | None = Header(default=None)):
+    if x_api_key is None or not secrets.compare_digest(
+        x_api_key.encode(), config.API_KEY.encode()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API key inválida o ausente",
+        )
+
+
+# Todo lo que cuelga de este router exige el header X-API-Key.
+# Solo /health y /health/ready quedan abiertos (los usan Docker y el balanceador).
+protected = APIRouter(dependencies=[Depends(require_api_key)])
 
 
 # -------------------------
@@ -29,11 +47,23 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/health/ready")
+def health_ready(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="PostgreSQL no responde",
+        )
+    return {"status": "ready", "warehouse_id": config.WAREHOUSE_ID}
+
+
 # -------------------------
 # PRODUCTOS
 # -------------------------
 
-@app.post(
+@protected.post(
     "/products",
     response_model=schemas.ProductResponse,
     status_code=status.HTTP_201_CREATED,
@@ -46,12 +76,12 @@ def create_product(
         return services.create_product(db, product)
     except services.DuplicateSKUError as error:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail=str(error),
         )
 
 
-@app.get(
+@protected.get(
     "/products",
     response_model=list[schemas.ProductResponse],
 )
@@ -59,7 +89,7 @@ def get_products(db: Session = Depends(get_db)):
     return services.get_products(db)
 
 
-@app.get(
+@protected.get(
     "/products/{product_id}",
     response_model=schemas.ProductResponse,
 )
@@ -78,7 +108,7 @@ def get_product(
     return product
 
 
-@app.put(
+@protected.put(
     "/products/{product_id}",
     response_model=schemas.ProductResponse,
 )
@@ -98,12 +128,12 @@ def update_product(
 
     except services.DuplicateSKUError as error:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail=str(error),
         )
 
 
-@app.delete(
+@protected.delete(
     "/products/{product_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
@@ -121,31 +151,18 @@ def delete_product(
             detail=str(error),
         )
 
-
-# -------------------------
-# INVENTARIO
-# -------------------------
-
-@app.get(
-    "/inventory/{product_id}",
-    response_model=schemas.InventoryResponse,
-)
-def get_inventory(
-    product_id: int,
-    db: Session = Depends(get_db),
-):
-    inventory = services.get_inventory(db, product_id)
-
-    if inventory is None:
+    except services.ProductInUseError as error:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Inventario no encontrado",
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(error),
         )
 
-    return inventory
 
+# -------------------------
+# INVENTARIO (de la bodega definida por WAREHOUSE_ID)
+# -------------------------
 
-@app.post(
+@protected.post(
     "/inventory/movements",
     response_model=schemas.MovementResponse,
     status_code=status.HTTP_201_CREATED,
@@ -163,19 +180,44 @@ def create_inventory_movement(
             detail=str(error),
         )
 
-    except services.InsufficientStockError as error:
+    except (
+        services.InsufficientStockError,
+        services.InvalidAdjustmentError,
+    ) as error:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail=str(error),
         )
 
 
-@app.get(
-    "/inventory/{product_id}/movements",
+@protected.get(
+    "/inventory/{sku}",
+    response_model=schemas.InventoryResponse,
+)
+def get_inventory(
+    sku: str,
+    db: Session = Depends(get_db),
+):
+    inventory = services.get_inventory(db, sku)
+
+    if inventory is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Inventario no encontrado",
+        )
+
+    return inventory
+
+
+@protected.get(
+    "/inventory/{sku}/movements",
     response_model=list[schemas.MovementResponse],
 )
 def get_inventory_movements(
-    product_id: int,
+    sku: str,
     db: Session = Depends(get_db),
 ):
-    return services.get_inventory_movements(db, product_id)
+    return services.get_inventory_movements(db, sku)
+
+
+app.include_router(protected)
