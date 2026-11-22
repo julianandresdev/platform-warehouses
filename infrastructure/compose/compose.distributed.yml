@@ -126,13 +126,27 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
-    ports: ["127.0.0.1:15672:15672"]
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
     volumes: [rabbitmq_data:/var/lib/rabbitmq]
     networks: [messaging]
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
+      timeout: 5s
       retries: 10
+
+  rabbitmq_topology:
+    build:
+      context: ../../services
+      dockerfile: warehouse-api/Dockerfile
+    command: ["python", "-m", "common.topology"]
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+    depends_on:
+      rabbitmq: {condition: service_healthy}
+    restart: "no"
 
   nginx:
     image: nginx:1.27.5-alpine
