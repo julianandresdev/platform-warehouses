@@ -1,0 +1,12 @@
+﻿NAME                    IMAGE                             COMMAND                  SERVICE       CREATED         STATUS                   PORTS
+compose-nginx-1         nginx:1.27.5-alpine               "/docker-entrypoint.ÔÇª"   nginx         5 minutes ago   Up 5 minutes             127.0.0.1:8080->80/tcp
+compose-rabbitmq-1      rabbitmq:3.13-management-alpine   "docker-entrypoint.sÔÇª"   rabbitmq      5 minutes ago   Up 5 minutes (healthy)   127.0.0.1:15672->15672/tcp
+compose-wh001_api-1     compose-wh001_api                 "uvicorn app:app --hÔÇª"   wh001_api     5 minutes ago   Up 5 minutes (healthy)   127.0.0.1:8101->8000/tcp
+compose-wh001_db-1      postgres:16-alpine                "docker-entrypoint.sÔÇª"   wh001_db      5 minutes ago   Up 5 minutes (healthy)   5432/tcp
+compose-wh001_redis-1   redis:7-alpine                    "docker-entrypoint.sÔÇª"   wh001_redis   5 minutes ago   Up 5 minutes (healthy)   6379/tcp
+compose-wh002_api-1     compose-wh002_api                 "uvicorn app:app --hÔÇª"   wh002_api     5 minutes ago   Up 3 minutes (healthy)   8000/tcp
+compose-wh002_db-1      postgres:16-alpine                "docker-entrypoint.sÔÇª"   wh002_db      5 minutes ago   Up 5 minutes (healthy)   5432/tcp
+compose-wh002_redis-1   redis:7-alpine                    "docker-entrypoint.sÔÇª"   wh002_redis   5 minutes ago   Up 5 minutes (healthy)   6379/tcp
+compose-wh003_api-1     compose-wh003_api                 "uvicorn app:app --hÔÇª"   wh003_api     5 minutes ago   Up 5 minutes (healthy)   127.0.0.1:8103->8000/tcp
+compose-wh003_db-1      postgres:16-alpine                "docker-entrypoint.sÔÇª"   wh003_db      5 minutes ago   Up 5 minutes (healthy)   5432/tcp
+compose-wh003_redis-1   redis:7-alpine                    "docker-entrypoint.sÔÇª"   wh003_redis   5 minutes ago   Up 5 minutes (healthy)   6379/tcp

@@ -1,0 +1,20 @@
+PRUEBA DE AISLAMIENTO ENTRE BODEGAS
+
+===== wh001 =====
+ id |          sku           |           name            
+----+------------------------+---------------------------
+  1 | PRUEBA-AISLAMIENTO-001 | Producto de prueba WH-001
+(1 row)
+
+
+===== wh002 =====
+ id | sku | name 
+----+-----+------
+(0 rows)
+
+
+===== wh003 =====
+ id | sku | name 
+----+-----+------
+(0 rows)
+
