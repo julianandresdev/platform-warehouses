@@ -1,0 +1,3 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+GET,GET /inventory/1,HTTPError('504 Server Error: Gateway Time-out for url: GET /inventory/1'),237,2026-11-22T04:09:22Z,2026-11-22T04:10:23Z
+GET,GET /products,HTTPError('504 Server Error: Gateway Time-out for url: GET /products'),263,2026-11-22T04:09:22Z,2026-11-22T04:10:23Z
