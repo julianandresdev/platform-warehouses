@@ -1,0 +1,23 @@
+﻿FASE 5 - PRUEBA DE TOLERANCIA A FALLOS
+
+Servicio: WH-002
+Balanceador: Nginx
+Puerto: 8080
+
+Escenario:
+- 3 replicas iniciales saludables.
+- Se detuvo wh002_api-2.
+- Se enviaron 20 solicitudes HTTP GET /health.
+- Las 20 solicitudes respondieron correctamente.
+- Se reinicio wh002_api-2.
+- Las 3 replicas quedaron saludables.
+
+RESULTADOS:
+Solicitudes realizadas: 20
+Solicitudes exitosas: 20
+Errores observados: 0
+Tasa de exito: 100%
+
+Conclusion:
+Nginx mantuvo la disponibilidad del endpoint /health
+durante la prueba con una replica detenida.

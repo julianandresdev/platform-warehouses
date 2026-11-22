@@ -1,0 +1,132 @@
+# Ejecutar desde la raíz del repositorio:
+# docker compose -f infrastructure/compose/compose.distributed.yml up -d --build
+# Misma imagen de API para todas las bodegas. Las variables se obtienen del entorno.
+x-api: &api
+  build:
+    context: ../../services/warehouse-api
+  environment:
+    DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@db:5432/platform
+    REDIS_URL: redis://redis:6379/0
+    RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+  expose: ["8000"]
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+    interval: 10s
+    timeout: 4s
+    retries: 5
+
+x-db: &db
+  image: postgres:16-alpine
+  environment:
+    POSTGRES_DB: platform
+    POSTGRES_USER: admin
+    POSTGRES_PASSWORD: ${DB_PASSWORD:-localdev}
+    TZ: UTC
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U admin -d platform"]
+    interval: 5s
+    timeout: 5s
+    retries: 10
+
+x-redis: &redis
+  image: redis:7-alpine
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "redis-cli", "ping"]
+    interval: 5s
+    timeout: 3s
+    retries: 5
+
+services:
+  wh001_db:
+    <<: *db
+    volumes: [wh001_pg:/var/lib/postgresql/data]
+    networks: [wh001]
+  wh001_redis:
+    <<: *redis
+    networks: [wh001]
+  wh001_api:
+    <<: *api
+    environment:
+      WAREHOUSE_ID: WH-001
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh001_db:5432/platform
+      REDIS_URL: redis://wh001_redis:6379/0
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    ports: ["127.0.0.1:8101:8000"]
+    depends_on:
+      wh001_db: {condition: service_healthy}
+      wh001_redis: {condition: service_healthy}
+    networks: [wh001, messaging]
+
+  wh002_db:
+    <<: *db
+    volumes: [wh002_pg:/var/lib/postgresql/data]
+    networks: [wh002]
+  wh002_redis:
+    <<: *redis
+    networks: [wh002]
+  wh002_api:
+    <<: *api
+    environment:
+      WAREHOUSE_ID: WH-002
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh002_db:5432/platform
+      REDIS_URL: redis://wh002_redis:6379/0
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    # No se expone un puerto fijo: permite --scale wh002_api=3
+    depends_on:
+      wh002_db: {condition: service_healthy}
+      wh002_redis: {condition: service_healthy}
+    networks: [wh002, messaging]
+
+  wh003_db:
+    <<: *db
+    volumes: [wh003_pg:/var/lib/postgresql/data]
+    networks: [wh003]
+  wh003_redis:
+    <<: *redis
+    networks: [wh003]
+  wh003_api:
+    <<: *api
+    environment:
+      WAREHOUSE_ID: WH-003
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh003_db:5432/platform
+      REDIS_URL: redis://wh003_redis:6379/0
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    ports: ["127.0.0.1:8103:8000"]
+    depends_on:
+      wh003_db: {condition: service_healthy}
+      wh003_redis: {condition: service_healthy}
+    networks: [wh003, messaging]
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports: ["127.0.0.1:15672:15672"]
+    volumes: [rabbitmq_data:/var/lib/rabbitmq]
+    networks: [messaging]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      retries: 10
+
+  nginx:
+    image: nginx:1.27.5-alpine
+    ports: ["127.0.0.1:8080:80"]
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      wh002_api: {condition: service_healthy}
+    networks: [wh002]
+
+networks:
+  wh001: {}
+  wh002: {}
+  wh003: {}
+  messaging: {}
+
+volumes:
+  wh001_pg: {}
+  wh002_pg: {}
+  wh003_pg: {}
+  rabbitmq_data: {}
