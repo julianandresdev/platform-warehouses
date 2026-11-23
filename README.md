@@ -161,6 +161,7 @@ docker compose up --build
 Docker Compose inicia:
 
 - PostgreSQL en el puerto 5432, con el esquema y la semilla de `WH-001` ya aplicados.
+- RabbitMQ en el puerto 5672 (AMQP) y la consola de management en 15672 (`guest`/`guest`).
 - FastAPI en el puerto 8000.
 
 Variables de entorno (ver `.env.example`): `WAREHOUSE_ID` (por defecto `WH-001`) y `API_KEY` (por defecto `dev-api-key` en desarrollo).
@@ -180,6 +181,9 @@ La documentación interactiva de FastAPI está disponible en:
 ```text
 http://localhost:8000/docs
 ```
+
+La topología de exchanges, colas y routing keys está en [`docs/events.md`](docs/events.md).
+El cliente común de publicación y consumo está en `services/common/common/rabbit.py`.
 
 ## Pruebas
 
