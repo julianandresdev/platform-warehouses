@@ -6,6 +6,8 @@ import cache
 import config
 import models
 import schemas
+from common.events import new_event
+from common.outbox import add_event
 
 # Códigos SQLSTATE de PostgreSQL
 UNIQUE_VIOLATION = "23505"
@@ -248,6 +250,25 @@ def process_inventory_movement(
 
         db.add(db_movement)
         db.flush()
+
+        event = new_event(
+            event_type="INVENTORY_UPDATED",
+            payload={
+                "warehouse_id": warehouse_id,
+                "sku": product.sku,
+                "quantity": inventory.quantity,
+                "reserved_quantity": inventory.reserved_quantity,
+                "version": inventory.version,
+                "movement_type": movement.type.value,
+            },
+            source=f"warehouse-{warehouse_id}",
+        )
+        add_event(
+            db,
+            event,
+            exchange="warehouse.events",
+            routing_key=f"warehouse.{warehouse_id}.inventory.updated",
+        )
 
     # Ya hay COMMIT. Invalidar antes dejaría que una lectura concurrente volviera
     # a cachear el valor viejo (ADR-0008).

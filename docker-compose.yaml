@@ -8,7 +8,7 @@ services:
       # Selecciona infrastructure/sql/warehouse/seed/<WAREHOUSE_ID>.sql
       WAREHOUSE_ID: ${WAREHOUSE_ID:-WH-001}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       # schema.sql, migrations/ y seed/ se aplican con init.sh al crear el volumen
@@ -72,6 +72,7 @@ services:
         condition: service_healthy
     restart: "no"
 
+
   # Carga: docker compose --profile load run --rm locust
   # Variables: LOAD_NAME (prefijo del CSV), LOAD_USERS, LOAD_TIME, LOAD_SCENARIO, LOAD_SKU.
   locust:
@@ -92,6 +93,22 @@ services:
       ${LOAD_SCENARIO:-ReadSameSku}
     depends_on:
       - api
+
+  outbox-worker:
+    build: {context: ./services, dockerfile: warehouse-api/Dockerfile}
+    command: ["python", "-m", "workers.outbox_relay"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://admin:admin@db:5432/platform
+      WAREHOUSE_ID: ${WAREHOUSE_ID:-WH-001}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    restart: unless-stopped
+
 
 volumes:
   pgdata: {}

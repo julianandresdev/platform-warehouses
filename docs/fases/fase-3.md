@@ -17,3 +17,11 @@ La prueba `tests/integration/test_rabbit.py` publicó y consumió un mensaje rea
 `rabbitmqctl list_exchanges name type durable` mostró `warehouse.events`, `central.events`, `warehouse.commands`, `iot.readings` y `dlx`. `rabbitmqctl list_queues name durable arguments` mostró las colas del contrato con `x-dead-letter-exchange=dlx`. El servicio `rabbitmq-topology` terminó con código 0.
 
 La consola de management está disponible en `http://localhost:15672` mientras el contenedor está activo. Las preguntas del profesor de F3 se completarán al integrar D-03 y D-04.
+
+## Avance D-03 — Outbox y heartbeat
+
+En progreso: cada movimiento inserta `INVENTORY_UPDATED` en `outbox` dentro de su transacción. El worker publica filas pendientes con confirmación, reintenta con backoff cuando falla RabbitMQ y emite `WAREHOUSE_HEARTBEAT` cada 30 segundos. La migración está en `infrastructure/sql/warehouse/migrations/001_outbox.sql`; el ADR asociado es [ADR-0006](../adr/0006-patron-outbox.md).
+
+La prueba `tests/integration/test_outbox_relay.py` publicó un evento desde PostgreSQL a RabbitMQ y confirmó su `published_at`. El conjunto de pruebas unitarias de J-03 y las pruebas de integración RabbitMQ/outbox terminó con **19 pruebas pasadas** en Python 3.12.
+
+Se verificó también la recuperación real en Compose: con RabbitMQ detenido, `POST /inventory/movements` para `P-001` respondió **201** y la fila `INVENTORY_UPDATED` permaneció en el outbox pendiente (`attempts=1`). Después de reiniciar RabbitMQ, el worker la publicó con confirmación y la fila quedó con `published_at` no nulo (`attempts=2`); el outbox quedó sin pendientes. El mismo worker volvió a publicar el heartbeat.
