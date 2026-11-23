@@ -5,3 +5,10 @@ venv/
 # Enviroment variables
 .env
 __pycache__/
+
+# Respaldos locales de PostgreSQL
+/backups/
+
+/services/batch/main_postgresql_backup.py
+
+/exports/inventory/
