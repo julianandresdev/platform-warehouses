@@ -1,5 +1,4 @@
 aws_region = "us-east-1"
-bucket_name = "cambia-por-nombre-global-unico-123456789"
+bucket_name = "warehouse-platform-santi-2026"
 project_prefix = "warehouse-platform"
-# SOLO para demos con datos descartables y destruir el bucket no vacío.
 force_destroy_bucket = false
