@@ -1,4 +1,4 @@
-
+import hashlib
 import argparse
 import csv
 import io
@@ -54,11 +54,64 @@ def obtener_fecha():
     return parser.parse_args().fecha
 
 
+def validar_manifiesto(cliente_s3, bucket, fecha):
+    prefijo = (
+        f"inputs/movements/daily/{fecha.isoformat()}/"
+    )
+    clave = f"{prefijo}manifest.json"
+
+    respuesta = cliente_s3.get_object(
+        Bucket=bucket,
+        Key=clave,
+    )
+    manifiesto = json.loads(respuesta["Body"].read())
+
+    if manifiesto.get("status") != "COMPLETE":
+        raise ValueError("La exportación no está completa")
+
+    if manifiesto.get("report_date") != fecha.isoformat():
+        raise ValueError("La fecha del manifiesto no coincide")
+
+    archivos = manifiesto.get("warehouses", {})
+
+    if set(archivos) != set(BODEGAS):
+        raise ValueError(
+            "El manifiesto no contiene las tres bodegas"
+        )
+
+    for warehouse_id in BODEGAS:
+        datos = archivos[warehouse_id]
+        clave_esperada = f"{prefijo}{warehouse_id}.csv"
+
+        if datos["key"] != clave_esperada:
+            raise ValueError(
+                f"Ruta incorrecta para {warehouse_id}"
+            )
+
+        respuesta_csv = cliente_s3.get_object(
+            Bucket=bucket,
+            Key=clave_esperada,
+        )
+
+        contenido = respuesta_csv["Body"].read()
+        hash_real = hashlib.sha256(contenido).hexdigest()
+
+        if hash_real != datos["sha256"]:
+            raise ValueError(
+                f"Integridad incorrecta en {warehouse_id}"
+            )
+
+    logger.info(
+        "Manifiesto validado correctamente para %s",
+        fecha.isoformat(),
+    )
+
+
 def leer_movimientos(cliente_s3, bucket, warehouse_id, fecha):
     clave = (
-    f"inputs/movements/daily/"
-    f"{fecha.isoformat()}/{warehouse_id}.csv"
-)
+        f"inputs/movements/daily/"
+        f"{fecha.isoformat()}/{warehouse_id}.csv"
+    )
 
     logger.info("Leyendo s3://%s/%s", bucket, clave)
 
@@ -66,7 +119,6 @@ def leer_movimientos(cliente_s3, bucket, warehouse_id, fecha):
         Bucket=bucket,
         Key=clave,
     )
-
     contenido = respuesta["Body"].read().decode("utf-8-sig")
     lector = csv.DictReader(io.StringIO(contenido))
 
@@ -153,6 +205,7 @@ def leer_movimientos(cliente_s3, bucket, warehouse_id, fecha):
 
 
 def generar_reporte(cliente_s3, bucket, fecha):
+    validar_manifiesto(cliente_s3, bucket, fecha)
     bodegas = {}
     total_entradas = 0
     total_salidas = 0

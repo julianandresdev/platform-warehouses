@@ -1,4 +1,6 @@
-
+import hashlib
+import json
+from datetime import timezone
 import argparse
 import csv
 import io
@@ -146,6 +148,51 @@ def main():
             bucket,
             clave,
         )
+
+    manifiesto = {
+        "report_date": fecha.isoformat(),
+        "status": "COMPLETE",
+        "exported_at": datetime.now(
+            timezone.utc
+        ).isoformat(),
+        "source_timezone": "UTC",
+        "warehouses": {},
+    }
+
+    for warehouse_id, contenido in archivos.items():
+        clave = (
+            f"inputs/movements/daily/"
+            f"{fecha.isoformat()}/{warehouse_id}.csv"
+        )
+
+        manifiesto["warehouses"][warehouse_id] = {
+            "key": clave,
+            "sha256": hashlib.sha256(
+                contenido
+            ).hexdigest(),
+        }
+
+    clave_manifiesto = (
+        f"inputs/movements/daily/"
+        f"{fecha.isoformat()}/manifest.json"
+    )
+
+    cliente_s3.put_object(
+        Bucket=bucket,
+        Key=clave_manifiesto,
+        Body=json.dumps(
+            manifiesto,
+            indent=2,
+            sort_keys=True,
+        ).encode("utf-8"),
+        ContentType="application/json",
+    )
+
+    logger.info(
+        "Manifiesto guardado: s3://%s/%s",
+        bucket,
+        clave_manifiesto,
+    )
 
     logger.info(
         "Exportacion completada para %s",
