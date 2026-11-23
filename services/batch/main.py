@@ -1,13 +1,21 @@
 
+import argparse
 import csv
 import io
 import json
 import logging
 import os
-from datetime import datetime, timezone
+import registro_s3
+from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
 
 import boto3
-
+from registro import (
+    obtener_engine,
+    iniciar_ejecucion,
+    finalizar_ejecucion,
+    registrar_error,
+)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
@@ -18,20 +26,36 @@ logger = logging.getLogger("warehouse-batch")
 BODEGAS = ("WH-001", "WH-002", "WH-003")
 
 COLUMNAS = {
-    "sku",
-    "name",
-    "category",
-    "unit",
+    "id",
+    "product_id",
     "warehouse_id",
+    "type",
     "quantity",
-    "reserved_quantity",
-    "available_quantity",
-    "version",
+    "reference",
+    "created_at",
 }
 
+TIPOS = {"RECEIPT", "SHIPMENT", "ADJUSTMENT"}
 
-def leer_inventario(cliente_s3, bucket, warehouse_id):
-    clave = f"inputs/inventory/{warehouse_id}.csv"
+
+def obtener_fecha():
+    parser = argparse.ArgumentParser(
+        description="Reporte diario de movimientos de bodegas"
+    )
+
+    parser.add_argument(
+        "--date",
+        dest="fecha",
+        type=date.fromisoformat,
+        default=datetime.now(ZoneInfo("America/Bogota")).date(),
+        help="Fecha del reporte en formato YYYY-MM-DD",
+    )
+
+    return parser.parse_args().fecha
+
+
+def leer_movimientos(cliente_s3, bucket, warehouse_id, fecha):
+    clave = f"inputs/movements/{warehouse_id}.csv"
 
     logger.info("Leyendo s3://%s/%s", bucket, clave)
 
@@ -53,19 +77,23 @@ def leer_inventario(cliente_s3, bucket, warehouse_id):
             f"Columnas faltantes en {clave}: {sorted(faltantes)}"
         )
 
-    productos = []
-    sku_encontrados = set()
+    movimientos = []
+    ids_encontrados = set()
 
     for fila in lector:
-        sku = fila["sku"]
+        movimiento_id = int(fila["id"])
+        product_id = int(fila["product_id"])
+        cantidad = int(fila["quantity"])
 
-        if not sku:
-            raise ValueError(f"SKU vacío en {clave}")
+        if movimiento_id <= 0 or product_id <= 0:
+            raise ValueError(f"ID inválido en {clave}")
 
-        if sku in sku_encontrados:
-            raise ValueError(f"SKU duplicado: {sku} en {clave}")
+        if movimiento_id in ids_encontrados:
+            raise ValueError(
+                f"Movimiento duplicado: {movimiento_id} en {clave}"
+            )
 
-        sku_encontrados.add(sku)
+        ids_encontrados.add(movimiento_id)
 
         if fila["warehouse_id"] != warehouse_id:
             raise ValueError(
@@ -73,96 +101,161 @@ def leer_inventario(cliente_s3, bucket, warehouse_id):
                 f"{fila['warehouse_id']}"
             )
 
-        cantidad = int(fila["quantity"])
-        reservadas = int(fila["reserved_quantity"])
-        disponibles = int(fila["available_quantity"])
-        version = int(fila["version"])
+        tipo = fila["type"]
 
-        if cantidad < 0 or not 0 <= reservadas <= cantidad:
-            raise ValueError(f"Inventario inválido: {sku}")
+        if tipo not in TIPOS:
+            raise ValueError(f"Movimiento desconocido: {tipo}")
 
-        if disponibles != cantidad - reservadas:
+        if cantidad == 0:
             raise ValueError(
-                f"Cantidad disponible inconsistente: {sku}"
+                f"Cantidad inválida en movimiento {movimiento_id}"
             )
 
-        if version < 0:
-            raise ValueError(f"Versión inválida: {sku}")
+        if tipo in {"RECEIPT", "SHIPMENT"} and cantidad < 0:
+            raise ValueError(
+                f"Cantidad negativa no permitida para {tipo}"
+            )
 
-        productos.append({
-            "sku": sku,
-            "name": fila["name"],
-            "category": fila["category"],
-            "unit": fila["unit"],
+        fecha_movimiento = datetime.fromisoformat(
+            fila["created_at"].strip()
+        )
+
+        # PostgreSQL utiliza TIMESTAMP sin zona horaria.
+        # Se compara la fecha almacenada sin convertirla.
+        if fecha_movimiento.date() != fecha:
+            continue
+
+        movimientos.append({
+            "id": movimiento_id,
+            "product_id": product_id,
             "warehouse_id": warehouse_id,
+            "type": tipo,
             "quantity": cantidad,
-            "reserved_quantity": reservadas,
-            "available_quantity": disponibles,
-            "version": version,
+            "reference": fila["reference"] or None,
+            "created_at": fecha_movimiento.isoformat(),
         })
 
-    logger.info(
-        "%s: %d productos procesados",
-        warehouse_id,
-        len(productos),
+    movimientos.sort(
+        key=lambda m: (m["created_at"], m["id"])
     )
 
-    return productos
+    logger.info(
+        "%s: %d movimientos correspondientes a %s",
+        warehouse_id,
+        len(movimientos),
+        fecha.isoformat(),
+    )
+
+    return movimientos
 
 
-def generar_reporte(cliente_s3, bucket):
-    fecha = datetime.now(timezone.utc)
-    inventarios = {}
+def generar_reporte(cliente_s3, bucket, fecha):
+    bodegas = {}
+    total_entradas = 0
+    total_salidas = 0
+    total_ajustes = 0
+    total_movimientos = 0
 
     for warehouse_id in BODEGAS:
-        inventarios[warehouse_id] = leer_inventario(
+        movimientos = leer_movimientos(
             cliente_s3,
             bucket,
             warehouse_id,
+            fecha,
         )
 
-    productos = [
-        producto
-        for registros in inventarios.values()
-        for producto in registros
-    ]
+        entradas = sum(
+            m["quantity"]
+            for m in movimientos
+            if m["type"] == "RECEIPT"
+        )
 
-    reporte = {
-        "generated_at": fecha.isoformat(),
-        "report_type": "inventory_consolidated",
+        salidas = sum(
+            m["quantity"]
+            for m in movimientos
+            if m["type"] == "SHIPMENT"
+        )
+
+        ajustes = sum(
+            m["quantity"]
+            for m in movimientos
+            if m["type"] == "ADJUSTMENT"
+        )
+
+        bodegas[warehouse_id] = {
+            "total_movements": len(movimientos),
+            "entries": entradas,
+            "shipments": salidas,
+            "adjustments": ajustes,
+            "net_change": entradas - salidas + ajustes,
+            "movements": movimientos,
+        }
+
+        total_movimientos += len(movimientos)
+        total_entradas += entradas
+        total_salidas += salidas
+        total_ajustes += ajustes
+
+    return {
+        "report_type": "daily_inventory_movements",
+        "report_date": fecha.isoformat(),
         "source": "s3_csv",
-        "warehouses": inventarios,
-        "total_products": len(productos),
-        "total_units": sum(
-            producto["quantity"] for producto in productos
+        "total_warehouses": len(BODEGAS),
+        "total_movements": total_movimientos,
+        "total_entries": total_entradas,
+        "total_shipments": total_salidas,
+        "total_adjustments": total_ajustes,
+        "net_change": (
+            total_entradas - total_salidas + total_ajustes
         ),
-        "total_reserved": sum(
-            producto["reserved_quantity"]
-            for producto in productos
-        ),
-        "total_available": sum(
-            producto["available_quantity"]
-            for producto in productos
-        ),
+        "warehouses": bodegas,
     }
 
-    return reporte, fecha
 
 
 def subir_reporte(cliente_s3, bucket, reporte, fecha):
-    nombre = fecha.strftime(
-        "exports/inventory-report-%Y%m%dT%H%M%S%fZ.json"
-    )
+    clave = f"exports/daily-movements-{fecha.isoformat()}.json"
 
     contenido = json.dumps(
         reporte,
         ensure_ascii=False,
         indent=2,
+        sort_keys=True,
     ).encode("utf-8")
+
+    # Evitar una nueva escritura si el reporte no cambio.
+    try:
+        respuesta = cliente_s3.get_object(
+            Bucket=bucket,
+            Key=clave,
+        )
+    except cliente_s3.exceptions.NoSuchKey:
+        respuesta = None
+    except Exception as error:
+        codigo = (
+            getattr(error, "response", {})
+            .get("Error", {})
+            .get("Code")
+        )
+        if codigo in {"404", "NoSuchKey", "NotFound"}:
+            respuesta = None
+        else:
+            raise
+
+    if respuesta is not None:
+        anterior = respuesta["Body"].read()
+
+        if anterior == contenido:
+            logger.info(
+                "Reporte sin cambios: s3://%s/%s",
+                bucket,
+                clave,
+            )
+            return clave
 
     cliente_s3.put_object(
         Bucket=bucket,
-        Key=nombre,
+        Key=clave,
         Body=contenido,
         ContentType="application/json",
     )
@@ -170,11 +263,16 @@ def subir_reporte(cliente_s3, bucket, reporte, fecha):
     logger.info(
         "Reporte guardado en s3://%s/%s",
         bucket,
-        nombre,
+        clave,
     )
+
+    return clave
+
+
 
 
 def main():
+    fecha = obtener_fecha()
     bucket = os.environ["REPORT_BUCKET"]
 
     cliente_s3 = boto3.client(
@@ -182,21 +280,100 @@ def main():
         endpoint_url=os.getenv("S3_ENDPOINT_URL") or None,
     )
 
-    logger.info("Iniciando procesamiento AWS Batch")
+    backend = os.getenv("BATCH_REGISTRY_BACKEND")
 
-    reporte, fecha = generar_reporte(cliente_s3, bucket)
+    if backend is None:
+        backend = (
+            "postgres"
+            if os.getenv("BATCH_DATABASE_URL")
+            else "s3"
+        )
 
-    subir_reporte(cliente_s3, bucket, reporte, fecha)
+    if backend not in ("postgres", "s3"):
+        raise ValueError(
+            "BATCH_REGISTRY_BACKEND debe ser postgres o s3"
+        )
 
-    logger.info(
-        "Proceso completado: %d productos, "
-        "%d unidades totales, %d reservadas, "
-        "%d disponibles",
-        reporte["total_products"],
-        reporte["total_units"],
-        reporte["total_reserved"],
-        reporte["total_available"],
-    )
+    engine = None
+    registro = None
+
+    try:
+        if backend == "postgres":
+            engine = obtener_engine()
+
+            if engine is None:
+                raise RuntimeError(
+                    "BATCH_DATABASE_URL es obligatoria "
+                    "para el registro PostgreSQL"
+                )
+
+            autorizado = iniciar_ejecucion(engine, fecha)
+
+        else:
+            registro = registro_s3.iniciar_ejecucion(
+                cliente_s3, bucket, fecha
+            )
+            autorizado = registro is not None
+
+        if not autorizado:
+            logger.info(
+                "Ejecucion omitida para %s",
+                fecha.isoformat(),
+            )
+            return
+
+        logger.info(
+            "Iniciando procesamiento diario para %s",
+            fecha.isoformat(),
+        )
+
+        try:
+            reporte = generar_reporte(
+                cliente_s3, bucket, fecha
+            )
+
+            clave = subir_reporte(
+                cliente_s3, bucket, reporte, fecha
+            )
+
+            if backend == "postgres":
+                finalizar_ejecucion(engine, fecha, clave)
+            else:
+                registro_s3.finalizar_ejecucion(
+                    cliente_s3, bucket, registro, clave
+                )
+
+            logger.info(
+                "Proceso completado: fecha=%s, "
+                "movimientos=%d, entradas=%d, "
+                "salidas=%d, ajustes=%d, clave=%s",
+                fecha.isoformat(),
+                reporte["total_movements"],
+                reporte["total_entries"],
+                reporte["total_shipments"],
+                reporte["total_adjustments"],
+                clave,
+            )
+
+        except Exception as error:
+            try:
+                if backend == "postgres":
+                    registrar_error(engine, fecha, error)
+                else:
+                    registro_s3.registrar_error(
+                        cliente_s3, bucket, registro, error
+                    )
+            except Exception:
+                logger.exception(
+                    "No se pudo registrar el error del trabajo"
+                )
+
+            logger.exception("Fallo el procesamiento diario")
+            raise
+
+    finally:
+        if engine is not None:
+            engine.dispose()
 
 
 if __name__ == "__main__":
