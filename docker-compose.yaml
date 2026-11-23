@@ -8,7 +8,7 @@ services:
       # Selecciona infrastructure/sql/warehouse/seed/<WAREHOUSE_ID>.sql
       WAREHOUSE_ID: ${WAREHOUSE_ID:-WH-001}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       # schema.sql, migrations/ y seed/ se aplican con init.sh al crear el volumen
@@ -20,17 +20,73 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    # Solo caché: sin persistencia, se puede perder sin consecuencias.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   api:
     build: {context: ./services, dockerfile: warehouse-api/Dockerfile}
     environment:
       DATABASE_URL: postgresql+psycopg2://admin:admin@db:5432/platform
       WAREHOUSE_ID: ${WAREHOUSE_ID:-WH-001}
       API_KEY: ${API_KEY:-dev-api-key}
+      REDIS_URL: redis://redis:6379/0
+      CACHE_ENABLED: ${CACHE_ENABLED:-true}
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-30}
+      REDIS_TIMEOUT_SECONDS: ${REDIS_TIMEOUT_SECONDS:-0.2}
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+      # Redis solo se espera a que arranque: es opcional, la API responde sin él (fallback a PostgreSQL).
+      redis:
+        condition: service_started
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq-topology:
+    build: {context: ./services, dockerfile: warehouse-api/Dockerfile}
+    command: ["python", "-m", "common.topology"]
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: "no"
+
+  outbox-worker:
+    build: {context: ./services, dockerfile: warehouse-api/Dockerfile}
+    command: ["python", "-m", "workers.outbox_relay"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://admin:admin@db:5432/platform
+      WAREHOUSE_ID: ${WAREHOUSE_ID:-WH-001}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    restart: unless-stopped
 
 volumes:
   pgdata: {}
+  rabbitmq_data: {}

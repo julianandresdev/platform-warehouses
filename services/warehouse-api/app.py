@@ -4,9 +4,11 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Response, status
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+import cache
 import config
 import schemas
 import services
@@ -85,6 +87,11 @@ def health_ready(db: Session = Depends(get_db)):
             detail="PostgreSQL no responde",
         )
     return {"status": "ready", "warehouse_id": config.WAREHOUSE_ID}
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 # -------------------------
@@ -224,14 +231,27 @@ def create_inventory_movement(
 )
 def get_inventory(
     sku: str,
+    response: Response,
     db: Session = Depends(get_db),
 ):
+    cached, cache_status = cache.get_inventory(sku)
+    response.headers["X-Cache"] = cache_status
+    if cached is not None:
+        return cached
+
     inventory = services.get_inventory(db, sku)
 
     if inventory is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Inventario no encontrado",
+            headers={"X-Cache": cache_status},
+        )
+
+    if cache_status == cache.MISS:
+        cache.set_inventory(
+            sku,
+            schemas.InventoryResponse.model_validate(inventory).model_dump(mode="json"),
         )
 
     return inventory

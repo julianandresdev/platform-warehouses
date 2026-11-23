@@ -2,3 +2,5 @@ fastapi[standard]
 psycopg2-binary
 sqlalchemy
 python-dotenv
+redis
+prometheus-client

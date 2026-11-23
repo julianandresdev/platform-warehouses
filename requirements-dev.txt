@@ -2,3 +2,4 @@
 ./services/common
 pytest
 httpx
+fakeredis
