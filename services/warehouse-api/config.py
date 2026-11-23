@@ -8,6 +8,8 @@ load_dotenv()
 # cliente nunca lo envía. La misma imagen se levanta una vez por bodega.
 WAREHOUSE_ID = os.getenv("WAREHOUSE_ID", "WH-001").strip()
 
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
 # Clave que el cliente envía en el header X-API-Key. Sin ella la API no arranca.
 API_KEY = os.getenv("API_KEY", "")
 

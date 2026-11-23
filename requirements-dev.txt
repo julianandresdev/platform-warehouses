@@ -1,0 +1,4 @@
+-r services/warehouse-api/requirements.txt
+./services/common
+pytest
+httpx
