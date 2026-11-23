@@ -55,8 +55,17 @@ def get_inventory(sku: str):
     if raw is None:
         cache_misses_total.inc()
         return None, MISS
+    try:
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise ValueError("el valor cacheado no es un objeto")
+    except ValueError:
+        # Valor corrupto o de otro formato: se descarta y se lee de PostgreSQL.
+        logger.warning("cache_corrupt", extra={"sku": sku})
+        invalidate_inventory(sku)
+        return None, BYPASS
     cache_hits_total.inc()
-    return json.loads(raw), HIT
+    return data, HIT
 
 
 def set_inventory(sku: str, data: dict) -> None:

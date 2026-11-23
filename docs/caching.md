@@ -13,6 +13,11 @@ Cache Aside sobre Redis para `GET /inventory/{sku}`. Decisión y alternativas en
 
 Llave: `warehouse:{WAREHOUSE_ID}:inventory:{sku}`.
 
+## Límites conocidos
+
+- Una lectura que ya estaba en curso cuando se hizo el movimiento puede dejar el valor viejo en Redis hasta que expire el TTL (máximo 30 s). Ver [ADR-0008](adr/0008-cache-aside-con-redis.md). La garantía de "valor nuevo de inmediato" aplica a lecturas que empiezan después del movimiento.
+- Un valor ilegible en Redis se descarta (`cache_corrupt`) y se responde desde PostgreSQL.
+
 ## Configuración
 
 | Variable | Default | Uso |

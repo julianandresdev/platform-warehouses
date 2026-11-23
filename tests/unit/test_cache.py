@@ -86,3 +86,23 @@ def test_redis_real_inalcanzable_responde_rapido(monkeypatch):
     t = time.perf_counter()
     assert cache.get_inventory("P-001") == (None, cache.BYPASS)
     assert time.perf_counter() - t < 1
+
+
+@pytest.mark.parametrize("basura", [b"{no es json", b"[1, 2]", b"\xff\xfe"])
+def test_valor_corrupto_es_bypass_y_se_borra(fake, basura, caplog):
+    fake.set(cache.inventory_key("P-001"), basura)
+    with caplog.at_level("WARNING", logger="warehouse-api"):
+        assert cache.get_inventory("P-001") == (None, cache.BYPASS)
+    assert "cache_corrupt" in [r.getMessage() for r in caplog.records]
+    assert fake.get(cache.inventory_key("P-001")) is None
+    # tras borrarlo, la siguiente lectura es un miss normal
+    assert cache.get_inventory("P-001") == (None, cache.MISS)
+
+
+def test_ventana_conocida_relleno_viejo_tras_invalidar(fake):
+    """Documenta el límite del ADR-0008: una lectura en curso puede re-cachear el valor viejo."""
+    assert cache.get_inventory("P-001") == (None, cache.MISS)   # la lectura A lee PostgreSQL (valor viejo)
+    cache.invalidate_inventory("P-001")                          # llega el movimiento: commit + DEL
+    cache.set_inventory("P-001", {"quantity": 10})               # A termina y guarda el valor viejo
+    assert cache.get_inventory("P-001") == ({"quantity": 10}, cache.HIT)
+    assert 0 < fake.ttl(cache.inventory_key("P-001")) <= 30      # pero el TTL acota el daño
