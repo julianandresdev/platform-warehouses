@@ -44,3 +44,16 @@ curl -i -H "X-API-Key: dev-api-key" localhost:8000/inventory/P-001   # 200, BYPA
 ```
 
 Con `CACHE_ENABLED=false docker compose up -d api` todas las lecturas salen `BYPASS` (base para el experimento de J-06).
+
+## Experimento de carga
+
+```bash
+python3 scripts/experimento_cache.py                     # 100 usuarios, 2 min, con y sin caché
+LOAD_TIME=20s python3 scripts/experimento_cache.py       # prueba rápida
+LOAD_TAG=saturacion LOAD_WAIT=0 LOAD_TIME=1m python3 scripts/experimento_cache.py
+```
+
+El script recrea la API con `CACHE_ENABLED=true` y `false`, lanza Locust (`docker compose --profile load run --rm locust`) y escribe `resumen.md` y los CSV en `docs/evidencias/fase-2/`. Mide RPS, P50/P95/P99, CPU (`docker stats`), la diferencia de `pg_stat_database.xact_commit` y la tasa de hit. Resultados y lectura en [fase-2.md](fases/fase-2.md).
+
+Escenarios del [locustfile](../tests/load/locustfile.py) (se eligen por nombre con `LOAD_SCENARIO`): `ReadSameSku` (default), `UsuarioBodega` y `ReadWriteMix`. Otras variables: `LOAD_USERS`, `LOAD_TIME`, `LOAD_SKU`, `LOAD_WAIT`.
+

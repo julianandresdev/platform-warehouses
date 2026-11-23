@@ -13,7 +13,20 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 # para no ensuciar los logs ni afectar las pruebas de carga.
 SQL_ECHO = os.getenv("SQL_ECHO", "false").lower() == "true"
 
-engine = create_engine(DATABASE_URL, echo=SQL_ECHO)
+# Pool de conexiones. FastAPI atiende los endpoints síncronos en un pool de 40 hilos;
+# con menos conexiones que hilos (el default de SQLAlchemy es 5 + 10) los hilos esperan
+# una conexión y la limpieza que la liberaría no consigue hilo: la API se atasca hasta
+# el timeout de 30 s (visto en la prueba de carga de J-06 sin caché).
+DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "20"))
+DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "20"))
+
+engine = create_engine(
+    DATABASE_URL,
+    echo=SQL_ECHO,
+    pool_size=DB_POOL_SIZE,
+    max_overflow=DB_MAX_OVERFLOW,
+    pool_pre_ping=True,
+)
 
 SessionLocal = sessionmaker(
     autocommit=False,
