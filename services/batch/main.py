@@ -55,7 +55,10 @@ def obtener_fecha():
 
 
 def leer_movimientos(cliente_s3, bucket, warehouse_id, fecha):
-    clave = f"inputs/movements/{warehouse_id}.csv"
+    clave = (
+    f"inputs/movements/daily/"
+    f"{fecha.isoformat()}/{warehouse_id}.csv"
+)
 
     logger.info("Leyendo s3://%s/%s", bucket, clave)
 
