@@ -15,7 +15,7 @@ import pika
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.exceptions import AMQPConnectionError, NackError, UnroutableError
 
-from common.correlation import correlation_id_context
+from common.correlation import reset_correlation_id, set_correlation_id
 
 logger = logging.getLogger(__name__)
 
@@ -261,7 +261,7 @@ def _deliver(
         if not isinstance(message, dict):
             raise ValueError("El sobre debe ser un objeto JSON")
         correlation_id = message.get("correlation_id") or properties.correlation_id
-        token = correlation_id_context.set(correlation_id)
+        token = set_correlation_id(correlation_id)
         handler(message)
     except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
         logger.exception("rabbit_invalid_message", extra={"queue": method.routing_key})
@@ -273,5 +273,5 @@ def _deliver(
         return
     finally:
         if token is not None:
-            correlation_id_context.reset(token)
+            reset_correlation_id(token)
     channel.basic_ack(delivery_tag=method.delivery_tag)

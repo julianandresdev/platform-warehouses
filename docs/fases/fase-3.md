@@ -4,7 +4,7 @@
 
 Se añadió RabbitMQ con consola de management y healthcheck a los Compose raíz y distribuido. El paquete `services/common` incluye el cliente `common.rabbit` para conexión con reintento, declaración durable e idempotente de exchanges, colas y bindings, publicación JSON persistente con publisher confirms y consumo con ack manual. El consumidor establece el `correlation_id` en el ContextVar compartido mientras ejecuta el handler y confirma el mensaje solo si el handler retorna correctamente.
 
-Los errores del handler se reencolan por ahora. El límite de reintentos y las DLQ pertenecen a D-05. El ContextVar queda expuesto para que J-03 integre después el middleware HTTP con el mismo contexto.
+Los errores del handler se reencolan por ahora. El límite de reintentos y las DLQ pertenecen a D-05. El consumidor usa `set_correlation_id` y `reset_correlation_id` de J-03 para compartir el mismo contexto con el middleware HTTP.
 
 ## Contrato
 
@@ -12,6 +12,8 @@ La topología y los mensajes están documentados en [events.md](../events.md). L
 
 ## Evidencia y preguntas
 
-La prueba `tests/integration/test_rabbit.py` publica y consume un mensaje real y comprueba el correlation ID dentro del handler. Para ejecutarla con el broker disponible: `RABBITMQ_URL=amqp://guest:guest@localhost:5672/%2F pytest -q tests/integration/test_rabbit.py`.
+La prueba `tests/integration/test_rabbit.py` publicó y consumió un mensaje real y comprobó el correlation ID dentro del handler: **1 prueba pasada** con Python 3.12 y RabbitMQ 3.13. Se ejecutó en un contenedor unido a la red de Compose.
 
-Pendiente guardar evidencia visual de la consola de management y ejecutar la prueba contra un broker; Docker Engine no estaba disponible durante esta implementación. Las preguntas del profesor de F3 se completarán al integrar D-03 y D-04.
+`rabbitmqctl list_exchanges name type durable` mostró `warehouse.events`, `central.events`, `warehouse.commands`, `iot.readings` y `dlx`. `rabbitmqctl list_queues name durable arguments` mostró las colas del contrato con `x-dead-letter-exchange=dlx`. El servicio `rabbitmq-topology` terminó con código 0.
+
+La consola de management está disponible en `http://localhost:15672` mientras el contenedor está activo. Las preguntas del profesor de F3 se completarán al integrar D-03 y D-04.
