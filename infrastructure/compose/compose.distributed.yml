@@ -17,6 +17,16 @@ x-api: &api
     timeout: 4s
     retries: 5
 
+x-outbox-worker: &outbox-worker
+  build:
+    context: ../../services
+    dockerfile: warehouse-api/Dockerfile
+  command: ["python", "-m", "workers.outbox_relay"]
+  environment:
+    RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  restart: unless-stopped
+
 x-db-env: &db-env
   POSTGRES_DB: platform
   POSTGRES_USER: admin
@@ -69,6 +79,17 @@ services:
       wh001_db: {condition: service_healthy}
       wh001_redis: {condition: service_healthy}
     networks: [wh001, messaging]
+  wh001_worker:
+    <<: *outbox-worker
+    environment:
+      WAREHOUSE_ID: WH-001
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh001_db:5432/platform
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      wh001_db: {condition: service_healthy}
+      rabbitmq: {condition: service_started}
+    networks: [wh001, messaging]
 
   wh002_db:
     <<: *db
@@ -96,6 +117,17 @@ services:
       wh002_db: {condition: service_healthy}
       wh002_redis: {condition: service_healthy}
     networks: [wh002, messaging]
+  wh002_worker:
+    <<: *outbox-worker
+    environment:
+      WAREHOUSE_ID: WH-002
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh002_db:5432/platform
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      wh002_db: {condition: service_healthy}
+      rabbitmq: {condition: service_started}
+    networks: [wh002, messaging]
 
   wh003_db:
     <<: *db
@@ -122,6 +154,17 @@ services:
     depends_on:
       wh003_db: {condition: service_healthy}
       wh003_redis: {condition: service_healthy}
+    networks: [wh003, messaging]
+  wh003_worker:
+    <<: *outbox-worker
+    environment:
+      WAREHOUSE_ID: WH-003
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh003_db:5432/platform
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      wh003_db: {condition: service_healthy}
+      rabbitmq: {condition: service_started}
     networks: [wh003, messaging]
 
   rabbitmq:
