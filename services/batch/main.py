@@ -171,13 +171,22 @@ def leer_movimientos(cliente_s3, bucket, warehouse_id, fecha):
                 f"Cantidad negativa no permitida para {tipo}"
             )
 
+       
         fecha_movimiento = datetime.fromisoformat(
             fila["created_at"].strip()
         )
 
-        # PostgreSQL utiliza TIMESTAMP sin zona horaria.
-        # Se compara la fecha almacenada sin convertirla.
-        if fecha_movimiento.date() != fecha:
+        # PostgreSQL almacena los timestamps en UTC.
+        fecha_utc = fecha_movimiento.replace(
+            tzinfo=ZoneInfo("UTC")
+        )
+
+        # Convertir a la fecha correspondiente en Colombia.
+        fecha_colombia = fecha_utc.astimezone(
+            ZoneInfo("America/Bogota")
+        )
+
+        if fecha_colombia.date() != fecha:
             continue
 
         movimientos.append({
@@ -189,6 +198,7 @@ def leer_movimientos(cliente_s3, bucket, warehouse_id, fecha):
             "reference": fila["reference"] or None,
             "created_at": fecha_movimiento.isoformat(),
         })
+
 
     movimientos.sort(
         key=lambda m: (m["created_at"], m["id"])

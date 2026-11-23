@@ -1,27 +1,33 @@
-import hashlib
-import json
-from datetime import timezone
+
 import argparse
 import csv
+import hashlib
 import io
+import json
 import logging
 import os
-from datetime import date, datetime, time, timedelta
+
+from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import boto3
 from sqlalchemy import create_engine, text
+
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
 )
+
 logger = logging.getLogger("warehouse-exporter")
+
 
 BODEGAS = {
     "WH-001": "WH001_DATABASE_URL",
     "WH-002": "WH002_DATABASE_URL",
     "WH-003": "WH003_DATABASE_URL",
 }
+
 
 COLUMNAS = [
     "id",
@@ -32,6 +38,7 @@ COLUMNAS = [
     "reference",
     "created_at",
 ]
+
 
 CONSULTA = text("""
     SELECT
@@ -56,8 +63,32 @@ def consultar_movimientos(warehouse_id, variable, fecha):
         pool_pre_ping=True,
     )
 
-    inicio = datetime.combine(fecha, time.min)
-    fin = inicio + timedelta(days=1)
+    zona_colombia = ZoneInfo("America/Bogota")
+    zona_utc = ZoneInfo("UTC")
+
+    # Inicio del día solicitado en Colombia
+    inicio_local = datetime.combine(
+        fecha,
+        time.min,
+        tzinfo=zona_colombia,
+    )
+
+    # Inicio del día siguiente en Colombia
+    fin_local = datetime.combine(
+        fecha + timedelta(days=1),
+        time.min,
+        tzinfo=zona_colombia,
+    )
+
+    # PostgreSQL almacena TIMESTAMP sin zona horaria
+    # y los valores representan horas UTC.
+    inicio = inicio_local.astimezone(zona_utc).replace(
+        tzinfo=None
+    )
+
+    fin = fin_local.astimezone(zona_utc).replace(
+        tzinfo=None
+    )
 
     try:
         with engine.connect() as conexion:
@@ -80,36 +111,51 @@ def consultar_movimientos(warehouse_id, variable, fecha):
             warehouse_id,
             len(movimientos),
         )
+
         return movimientos
+
     finally:
         engine.dispose()
 
 
 def generar_csv(movimientos):
     salida = io.StringIO(newline="")
+
     escritor = csv.DictWriter(
         salida,
         fieldnames=COLUMNAS,
         lineterminator="\n",
     )
+
     escritor.writeheader()
 
     for movimiento in movimientos:
         fila = dict(movimiento)
+
         fila["created_at"] = fila["created_at"].isoformat(
             sep=" "
         )
+
         escritor.writerow(fila)
 
     return salida.getvalue().encode("utf-8")
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--date", required=True)
-    argumentos = parser.parse_args()
+    parser = argparse.ArgumentParser(
+        description="Exportar movimientos diarios de bodegas a S3"
+    )
 
-    fecha = date.fromisoformat(argumentos.date)
+    parser.add_argument(
+        "--date",
+        required=True,
+        type=date.fromisoformat,
+        help="Fecha del reporte en Colombia (YYYY-MM-DD)",
+    )
+
+    argumentos = parser.parse_args()
+    fecha = argumentos.date
+
     bucket = os.environ["REPORT_BUCKET"]
 
     cliente_s3 = boto3.client(
@@ -117,24 +163,29 @@ def main():
         endpoint_url=os.getenv("S3_ENDPOINT_URL") or None,
     )
 
-    # Primero consultar las tres bodegas.
-    # Si alguna conexión falla, no subir archivos parciales.
     archivos = {}
 
+    # Primero consultar las tres bodegas.
+    # Si alguna conexión falla, no publicar archivos parciales.
     for warehouse_id, variable in BODEGAS.items():
         movimientos = consultar_movimientos(
             warehouse_id,
             variable,
             fecha,
         )
-        archivos[warehouse_id] = generar_csv(movimientos)
 
-    # Guardar entradas separadas por fecha.
-    for warehouse_id, contenido in archivos.items():
-        clave = (
-            f"inputs/movements/daily/"
-            f"{fecha.isoformat()}/{warehouse_id}.csv"
+        archivos[warehouse_id] = generar_csv(
+            movimientos
         )
+
+    prefijo = (
+        f"inputs/movements/daily/"
+        f"{fecha.isoformat()}/"
+    )
+
+    # Publicar los CSV por fecha.
+    for warehouse_id, contenido in archivos.items():
+        clave = f"{prefijo}{warehouse_id}.csv"
 
         cliente_s3.put_object(
             Bucket=bucket,
@@ -149,6 +200,7 @@ def main():
             clave,
         )
 
+    # Crear el manifiesto de exportación.
     manifiesto = {
         "report_date": fecha.isoformat(),
         "status": "COMPLETE",
@@ -156,14 +208,12 @@ def main():
             timezone.utc
         ).isoformat(),
         "source_timezone": "UTC",
+        "report_timezone": "America/Bogota",
         "warehouses": {},
     }
 
     for warehouse_id, contenido in archivos.items():
-        clave = (
-            f"inputs/movements/daily/"
-            f"{fecha.isoformat()}/{warehouse_id}.csv"
-        )
+        clave = f"{prefijo}{warehouse_id}.csv"
 
         manifiesto["warehouses"][warehouse_id] = {
             "key": clave,
@@ -172,10 +222,9 @@ def main():
             ).hexdigest(),
         }
 
-    clave_manifiesto = (
-        f"inputs/movements/daily/"
-        f"{fecha.isoformat()}/manifest.json"
-    )
+    # Publicar el manifiesto al final,
+    # una vez subidos los tres CSV.
+    clave_manifiesto = f"{prefijo}manifest.json"
 
     cliente_s3.put_object(
         Bucket=bucket,
@@ -196,7 +245,7 @@ def main():
 
     logger.info(
         "Exportacion completada para %s",
-        fecha,
+        fecha.isoformat(),
     )
 
 
