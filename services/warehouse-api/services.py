@@ -2,6 +2,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+import cache
 import config
 import models
 import schemas
@@ -247,5 +248,9 @@ def process_inventory_movement(
 
         db.add(db_movement)
         db.flush()
+
+    # Ya hay COMMIT. Invalidar antes dejaría que una lectura concurrente volviera
+    # a cachear el valor viejo (ADR-0008).
+    cache.invalidate_inventory(movement.sku)
 
     return db_movement
