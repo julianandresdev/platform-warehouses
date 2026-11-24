@@ -11,19 +11,14 @@ resource "aws_batch_compute_environment" "warehouse_fargate" {
   type                     = "MANAGED"
   state                    = "ENABLED"
 
-  service_role = "arn:aws:iam::140340522043:role/aws-service-role/batch.amazonaws.com/AWSServiceRoleForBatch"
+  service_role = var.batch_service_role_arn
 
   compute_resources {
     type      = "FARGATE"
     max_vcpus = 4
 
-    subnets = [
-      "subnet-007766dbcad866597"
-    ]
-
-    security_group_ids = [
-      "sg-02b4a7b90f8c87207"
-    ]
+    subnets            = var.batch_subnet_ids
+    security_group_ids = var.batch_security_group_ids
   }
 }
 
@@ -49,10 +44,10 @@ resource "aws_batch_job_definition" "warehouse_inventory" {
   deregister_on_new_revision = false
 
   container_properties = jsonencode({
-    image = "140340522043.dkr.ecr.us-east-1.amazonaws.com/warehouse-platform-batch@sha256:680638e07d866bccc726195dbd02072912760084da7e7c45fe6139dfaaaba8e4"
+    image = var.batch_image_uri
 
-    jobRoleArn       = "arn:aws:iam::140340522043:role/LabRole"
-    executionRoleArn = "arn:aws:iam::140340522043:role/LabRole"
+    jobRoleArn       = var.batch_job_role_arn
+    executionRoleArn = var.batch_execution_role_arn
 
     resourceRequirements = [
       {

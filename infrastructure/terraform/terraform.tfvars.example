@@ -2,3 +2,17 @@ aws_region = "us-east-1"
 bucket_name = "warehouse-platform-santi-2026"
 project_prefix = "warehouse-platform"
 force_destroy_bucket = false
+batch_subnet_ids = [
+  "subnet-007766dbcad866597"
+]
+
+batch_security_group_ids = [
+  "sg-02b4a7b90f8c87207"
+]
+
+batch_service_role_arn = "arn:aws:iam::140340522043:role/aws-service-role/batch.amazonaws.com/AWSServiceRoleForBatch"
+
+batch_job_role_arn       = "arn:aws:iam::140340522043:role/LabRole"
+batch_execution_role_arn = "arn:aws:iam::140340522043:role/LabRole"
+
+batch_image_uri = "140340522043.dkr.ecr.us-east-1.amazonaws.com/warehouse-platform-batch@sha256:680638e07d866bccc726195dbd02072912760084da7e7c45fe6139dfaaaba8e4"
