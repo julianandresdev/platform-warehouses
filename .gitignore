@@ -12,3 +12,6 @@ __pycache__/
 /services/batch/main_postgresql_backup.py
 
 /exports/inventory/
+
+# Planes de Terraform
+*.tfplan
