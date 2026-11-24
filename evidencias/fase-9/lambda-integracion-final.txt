@@ -1,0 +1,8 @@
+﻿2026-11-24T03:19:51.874000+00:00 2026/11/24/[$LATEST]6d9dc246ae8e4fe38edcc952666407af INIT_START Runtime Version: python:3.12.mainlinev2.v86	Runtime Version ARN: arn:aws:lambda:us-east-1::runtime:9d15a516fef11563a8c452bd8d3fe5a5a120b73013e74783e925235557467534
+2026-11-24T03:19:52.242000+00:00 2026/11/24/[$LATEST]6d9dc246ae8e4fe38edcc952666407af START RequestId: df4739eb-97a2-4e1a-aaf6-4cf647562cb9 Version: $LATEST
+2026-11-24T03:19:52.449000+00:00 2026/11/24/[$LATEST]6d9dc246ae8e4fe38edcc952666407af [INFO]	2026-11-24T03:19:52.412Z	df4739eb-97a2-4e1a-aaf6-4cf647562cb9	Found credentials in environment variables.
+2026-11-24T03:19:54.950000+00:00 2026/11/24/[$LATEST]6d9dc246ae8e4fe38edcc952666407af [INFO]	2026-11-24T03:19:54.950Z	df4739eb-97a2-4e1a-aaf6-4cf647562cb9	Validando reporte s3://warehouse-platform-santi-2026/exports/phase9-integracion-final.json
+2026-11-24T03:19:55.484000+00:00 2026/11/24/[$LATEST]6d9dc246ae8e4fe38edcc952666407af [INFO]	2026-11-24T03:19:55.484Z	df4739eb-97a2-4e1a-aaf6-4cf647562cb9	Reporte valido y evento publicado: fecha=2026-11-19, movimientos=0
+2026-11-24T03:19:55.484000+00:00 2026/11/24/[$LATEST]6d9dc246ae8e4fe38edcc952666407af [INFO]	2026-11-24T03:19:55.484Z	df4739eb-97a2-4e1a-aaf6-4cf647562cb9	Resultado Lambda: {"processed": 1, "rejected": 0}
+2026-11-24T03:19:55.530000+00:00 2026/11/24/[$LATEST]6d9dc246ae8e4fe38edcc952666407af END RequestId: df4739eb-97a2-4e1a-aaf6-4cf647562cb9
+2026-11-24T03:19:55.530000+00:00 2026/11/24/[$LATEST]6d9dc246ae8e4fe38edcc952666407af REPORT RequestId: df4739eb-97a2-4e1a-aaf6-4cf647562cb9	Duration: 3287.48 ms	Billed Duration: 3653 ms	Memory Size: 128 MB	Max Memory Used: 94 MB	Init Duration: 364.66 ms

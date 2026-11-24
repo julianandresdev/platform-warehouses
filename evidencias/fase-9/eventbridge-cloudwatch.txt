@@ -1,0 +1,1 @@
+﻿2026-11-24T03:17:34.000000+00:00 8b967434-060a-3642-8450-f8405a4139ea {"version":"0","id":"624e1040-fdc2-fa6c-1507-9a6eaf5c1668","detail-type":"InventoryReportCreated","source":"warehouse.platform","account":"140340522043","time":"2026-11-24T03:17:34Z","region":"us-east-1","resources":[],"detail":{"test":true,"origin":"terraform-integration-test"}}
