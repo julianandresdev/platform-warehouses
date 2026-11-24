@@ -1,244 +1,127 @@
-\# Fase 9 — Integración Serverless con AWS Lambda, S3 y EventBridge
+# Fase 9 — AWS Lambda, S3 y EventBridge
 
+## 1. Objetivo
 
+Implementar procesamiento serverless basado en eventos, mediante una función AWS Lambda que detecta reportes JSON en Amazon S3, valida su contenido, transforma los datos y publica eventos en Amazon EventBridge.
 
-\## 1. Objetivo
+## 2. Arquitectura
 
+**AWS Batch Fargate → Amazon S3 → AWS Lambda → Amazon EventBridge**
 
+1. AWS Batch genera un reporte consolidado de inventarios.
+2. El reporte se almacena como JSON en el prefijo `exports/` de S3.
+3. S3 activa automáticamente Lambda mediante un evento `ObjectCreated`.
+4. Lambda descarga y valida el reporte.
+5. Lambda genera un resumen con los resultados de las tres bodegas.
+6. Publica el evento `InventoryReportCreated` en EventBridge.
+7. CloudWatch registra el procesamiento, los rechazos y los errores.
 
-Implementar una arquitectura serverless que permita detectar automáticamente los reportes generados en Amazon S3 y publicar eventos en Amazon EventBridge mediante AWS Lambda.
+## 3. Implementación
 
+**Código:** `services/lambda/handler.py`
 
+**Función:** `warehouse-platform-export-handler`
 
-\## 2. Arquitectura
+**Runtime:** Python 3.12
 
+**Región:** `us-east-1`
 
+**Bucket:** `warehouse-platform-santi-2026`
 
-El procesamiento sigue este flujo:
+La función procesa archivos JSON ubicados bajo `exports/`.
 
+Las validaciones incluyen:
 
+- Tipo de reporte `daily_inventory_movements`.
+- Fecha válida.
+- Presencia de las bodegas WH-001, WH-002 y WH-003.
+- Estructura y cantidad de movimientos.
+- Tipos y cantidades válidos.
+- Consistencia de los totales por bodega y generales.
 
-\*\*AWS Batch Fargate → Amazon S3 → AWS Lambda → Amazon EventBridge\*\*
+Los reportes inválidos son rechazados y registrados en CloudWatch sin publicar un evento.
 
+Los errores operativos de S3 o EventBridge se propagan como excepciones.
 
-
-1\. AWS Batch genera el reporte consolidado de inventarios.
-
-2\. El reporte JSON se guarda en el prefijo `exports/` de Amazon S3.
-
-3\. S3 activa automáticamente una función AWS Lambda.
-
-4\. Lambda identifica el reporte generado.
-
-5\. Lambda publica un evento en Amazon EventBridge.
-
-
-
-\## 3. Tecnologías utilizadas
-
-
-
-\- AWS Lambda con Python 3.12.
-
-\- Amazon S3.
-
-\- Amazon EventBridge.
-
-\- Amazon CloudWatch Logs.
-
-\- Terraform.
-
-\- AWS CLI.
-
-\- Boto3.
-
-
-
-\## 4. Implementación de Lambda
-
-
-
-El código fuente se encuentra en:
-
-
-
-`services/lambda/handler.py`
-
-
-
-La función implementada se llama:
-
-
-
-`warehouse-platform-export-handler`
-
-
-
-La función recibe eventos de Amazon S3 y verifica que los archivos pertenezcan al prefijo `exports/`.
-
-
-
-Para cada archivo válido, utiliza `put\_events()` para publicar un evento en EventBridge.
-
-
-
-Configuración del evento:
-
-
+## 4. Publicación en EventBridge
 
 | Propiedad | Valor |
-
 |---|---|
-
 | Source | `warehouse.platform` |
-
 | DetailType | `InventoryReportCreated` |
-
 | EventBusName | `default` |
+| Formato del detalle | JSON |
 
+El evento publicado incluye la ubicación del archivo en S3, la fecha, las tres bodegas, la cantidad de movimientos, las entradas, salidas, ajustes y el cambio neto.
 
+Lambda comprueba `FailedEntryCount` para detectar errores de publicación.
 
-El detalle del evento incluye el nombre del bucket, la clave del archivo y el tipo de evento recibido desde S3.
+## 5. Infraestructura
 
+La configuración Terraform se encuentra en `infrastructure/terraform/`.
 
+Incluye:
 
-La función comprueba el campo `FailedEntryCount` de la respuesta de EventBridge y genera un error si existen publicaciones fallidas.
+- Bucket S3.
+- Bloqueo de acceso público y cifrado.
+- Función AWS Lambda.
+- CloudWatch Logs.
+- Permisos de invocación desde S3.
+- Notificación `ObjectCreated` para `exports/`.
+- Permisos de lectura de S3 y publicación en EventBridge cuando Terraform crea el rol IAM.
 
+La infraestructura AWS Batch se gestiona por separado mediante AWS CLI y scripts del proyecto.
 
+## 6. Pruebas realizadas
 
-\## 5. Infraestructura con Terraform
+**Pruebas unitarias:** `services/lambda/tests/test_handler.py`
 
+Se ejecutaron cinco pruebas correctamente:
 
+1. Procesamiento de reporte válido.
+2. Rechazo de JSON malformado.
+3. Rechazo de totales inconsistentes.
+4. Rechazo de reporte sin una de las tres bodegas.
+5. Detección de errores de publicación en EventBridge.
 
-Se utilizó Terraform para configurar la infraestructura serverless de la fase 9.
+**Prueba real con JSON válido:**
 
+- Archivo: `exports/phase9-test-20261123192057.json`.
+- Resultado: `processed = 1`, `rejected = 0`.
+- CloudWatch confirmó la publicación aceptada por EventBridge.
 
+**Prueba real con JSON inválido:**
 
-Entre los componentes configurados se encuentran:
+- Archivo: `exports/phase9-invalid-20261123192218.json`.
+- Resultado: `processed = 0`, `rejected = 1`.
+- El reporte fue rechazado sin publicar un evento.
 
+## 7. Limitaciones
 
+Se creó y habilitó la regla EventBridge `warehouse-platform-report-created` para eventos `InventoryReportCreated`.
 
-\- Bucket S3.
+Sin embargo, la política IAM de AWS Academy `voc-cancel-cred` deniega explícitamente las operaciones `events:PutTargets` y `events:ListTargetsByRule`.
 
-\- Protección contra acceso público.
+Por tanto, se verificó que EventBridge aceptó la publicación, pero no se pudo verificar la entrega a un consumidor.
 
-\- Cifrado del bucket.
+Esta limitación no impidió comprobar el funcionamiento principal de Lambda.
 
-\- Función AWS Lambda.
+## 8. Comparación de tecnologías
 
-\- Grupo de registros de CloudWatch.
+| Característica | Worker | AWS Batch | AWS Lambda |
+|---|---|---|---|
+| Ejecución | Continua | Por trabajo | Por invocación |
+| Activación | Mensajes | Manual o programada | Eventos |
+| Escalamiento | Configurado | Administrado/configurado | Administrado |
+| Estado persistente | Externo | Externo | Externo |
+| Uso principal | Procesos asíncronos | Procesamiento masivo | Procesamiento corto por eventos |
 
-\- Permiso de invocación de Lambda desde S3.
+AWS Lambda se seleccionó porque el procesamiento del reporte es acotado y se activa automáticamente cuando aparece un archivo en S3.
 
-\- Notificación de S3 para objetos creados bajo el prefijo `exports/`.
+## 9. Conclusión
 
+Se implementó y probó el flujo S3 → AWS Lambda → EventBridge.
 
+La función valida los reportes de inventario, rechaza información inconsistente, genera un resumen y publica eventos para permitir futuras integraciones.
 
-La infraestructura se encuentra en:
-
-
-
-`infrastructure/terraform/`
-
-
-
-La función utiliza la variable de entorno:
-
-
-
-`EVENT\_BUS\_NAME=default`
-
-
-
-\## 6. Configuración AWS
-
-
-
-| Recurso | Configuración |
-
-|---|---|
-
-| Región | `us-east-1` |
-
-| Bucket | `warehouse-platform-santi-2026` |
-
-| Lambda | `warehouse-platform-export-handler` |
-
-| Runtime | Python 3.12 |
-
-| Prefijo de S3 | `exports/` |
-
-| Bus EventBridge | `default` |
-
-| Grupo CloudWatch | `/aws/lambda/warehouse-platform-export-handler` |
-
-
-
-\## 7. Pruebas realizadas
-
-
-
-Se verificó la ejecución de Lambda al crear un archivo de prueba en S3.
-
-
-
-Posteriormente, AWS Batch generó el reporte:
-
-
-
-`exports/inventory-report-20261123T051125636513Z.json`
-
-
-
-CloudWatch confirmó el procesamiento:
-
-
-
-`2026-11-23T05:11:29.713Z`
-
-
-
-`Reporte procesado: s3://warehouse-platform-santi-2026/exports/inventory-report-20261123T051125636513Z.json`
-
-
-
-Los registros mostraron la finalización de la ejecución sin errores.
-
-
-
-También se verificó mediante IAM que el rol utilizado tenía permiso para ejecutar `events:PutEvents` sobre el bus `default`.
-
-
-
-Dado que el mensaje de procesamiento se registra después de la llamada a `put\_events()` y de comprobar `FailedEntryCount`, los resultados proporcionan evidencia de que EventBridge aceptó la publicación del evento.
-
-
-
-\## 8. Limitaciones y consideraciones
-
-
-
-\- No se configuró una regla de EventBridge específica para consumir los eventos `InventoryReportCreated`.
-
-\- La solución valida la publicación del evento, pero no una acción posterior ejecutada por un consumidor.
-
-\- La configuración de Terraform puede requerir adaptaciones según las restricciones IAM de la cuenta AWS.
-
-\- La implementación de AWS Batch se realizó mediante AWS CLI; sus recursos no forman parte de la infraestructura Terraform de la fase 9.
-
-
-
-\## 9. Conclusión
-
-
-
-Se implementó y verificó una integración serverless para procesar automáticamente las notificaciones de reportes de inventario generados en Amazon S3.
-
-
-
-AWS Lambda recibió el evento de S3, identificó el reporte y realizó la publicación correspondiente en Amazon EventBridge.
-
-
-
-Esta arquitectura permite desacoplar la generación de reportes de otros servicios que podrían procesar los eventos en futuras ampliaciones.
-
+La funcionalidad principal de la fase 9 está comprobada. La entrega del evento a un consumidor permanece sin verificar debido a restricciones de IAM del laboratorio.
