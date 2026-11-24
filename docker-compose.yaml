@@ -109,6 +109,27 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # Pasos de la Saga (F6): consume wh-00X.commands y responde por el outbox.
+  commands-worker:
+    build: {context: ./services, dockerfile: warehouse-api/Dockerfile}
+    command: ["python", "-m", "workers.commands"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://admin:admin@db:5432/platform
+      WAREHOUSE_ID: ${WAREHOUSE_ID:-WH-001}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+      REDIS_URL: redis://redis:6379/0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Solo pruebas: <COMANDO>:before_commit|after_commit (ver workers/commands.py).
+      CHAOS_FAIL_STEP: ${CHAOS_FAIL_STEP:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
 
 volumes:
   pgdata: {}

@@ -89,6 +89,8 @@ Los comandos salen de la central por `warehouse.commands` con routing key igual 
 | `RECEIVE_TRANSFER` | Bodega destino | `TRANSFER_RECEIVED` o `TRANSFER_RECEIVE_FAILED` | Worker de comandos de la bodega | Registrar comando junto con la entrada de stock. |
 | `RETURN_STOCK` | Bodega origen | `STOCK_RETURNED` | Worker de comandos de la bodega | Registrar comando junto con el movimiento compensatorio. |
 
+Valores de `reason` que emite la bodega (J-07): `STOCK_RESERVATION_FAILED` usa `DEADLINE_EXCEEDED`, `INSUFFICIENT_STOCK` o `SKU_NOT_FOUND`; `TRANSFER_RECEIVE_FAILED` usa `SKU_NOT_FOUND`. Cada paso que cambia el inventario emite también `INVENTORY_UPDATED` con `movement_type` igual a `RESERVATION`, `RESERVATION_RELEASE`, `TRANSFER_OUT`, `TRANSFER_IN` o `TRANSFER_RETURN`. El detalle está en [distributed-transactions.md](distributed-transactions.md).
+
 ## Colas y bindings
 
 Todas son durables, tienen `prefetch_count = 10`, ack manual después del commit y dead-letter hacia `dlx`.
