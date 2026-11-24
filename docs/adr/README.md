@@ -1,16 +1,52 @@
-# Architecture Decision Records
+# Architecture Decision Records (ADR)
 
-Un ADR por cada decisión que tuvo alternativas. Formato del enunciado: contexto, alternativas, decisión, consecuencias.
+Los ADR registran las decisiones arquitectonicas del
+proyecto Warehouse Cloud Platform.
 
-Nombre de archivo: `NNNN-titulo-corto.md`.
+Cada documento debe explicar el contexto, las alternativas
+consideradas, la decision y sus consecuencias.
 
-La plantilla la agrega Esteban (E-01).
+## Plantilla
 
-| ADR | Título | Autor |
-| --- | --- | --- |
-| [0001](0001-fastapi-como-framework.md) | FastAPI como framework de la API de bodega | Julian |
-| [0003](0003-schema-sql-como-fuente-de-verdad.md) | `schema.sql` como fuente de verdad del esquema, con reglas en la base | Julian |
-| [0004](0004-control-de-concurrencia-en-movimientos.md) | Control de concurrencia en los movimientos de inventario | Julian |
-| [0005](0005-topologia-rabbitmq.md) | Topología de RabbitMQ y entrega confirmada | David |
-| [0006](0006-patron-outbox.md) | Publicación de eventos con outbox transaccional | David |
-| [0008](0008-cache-aside-con-redis.md) | Cache Aside con Redis e invalidación síncrona | Julian |
+Utilizar la [plantilla de ADR](0000-plantilla.md).
+
+Formato de nombre: NNNN-titulo-corto.md.
+
+## Indice de decisiones arquitectonicas
+
+Las fechas corresponden al cronograma original.
+El estado indica la disponibilidad del documento en esta rama.
+
+| ADR | Tema | Autor | Fecha prevista | Estado |
+| --- | --- | --- | --- | --- |
+| [0001](0001-fastapi-como-framework.md) | FastAPI + SQLAlchemy | Julian | 13 nov | Existente |
+| [0002](0002-una-imagen-por-dominio.md) | Una imagen por dominio con varios comandos | Julian | 13 nov | Existente |
+| [0003](0003-schema-sql-como-fuente-de-verdad.md) | schema.sql y migraciones en vez de create_all | Julian | 14 nov | Existente |
+| [0004](0004-control-de-concurrencia-en-movimientos.md) | WAREHOUSE_ID de texto y SKU como identificador global | Julian | 14 nov | Revisar correspondencia |
+| [0005](0005-topologia-rabbitmq.md) | Topologia de RabbitMQ | David | 15 nov | Existente |
+| [0006](0006-patron-outbox.md) | Patron Outbox | David | 16 nov | Existente |
+| 0007 | Una base por bodega | Santiago | 17 nov | Pendiente |
+| [0008](0008-cache-aside-con-redis.md) | Cache Aside, TTL e invalidacion sincrona contra asincrona | Julian | 17 nov | Existente |
+| 0009 | Nginx como balanceador y health checks pasivos | Santiago | 18 nov | Pendiente |
+| 0010 | API Key; usuarios y operadores fuera de alcance | Esteban | 18 nov | Pendiente |
+| 0011 | MinIO en local, S3 en AWS | Santiago | 19 nov | Pendiente |
+| 0012 | Read Model, CQRS y heartbeat | Esteban | 20 nov | Pendiente de integracion |
+| 0013 | Saga orquestada contra coreografia | Esteban | 21 nov | Pendiente de integracion |
+| 0014 | El Batch lee las bodegas por API | Julian | 21 nov | Pendiente |
+| 0015 | Reintentos, DLQ y clasificacion de errores | David | 21 nov | Pendiente |
+| 0016 | Prometheus + Grafana | Santiago | 22 nov | Pendiente |
+| 0017 | Lambda fuera de la VPC | Santiago | 23 nov | Pendiente |
+| 0018 | Despliegue en AWS Learner Lab | Santiago | 24 nov | Pendiente |
+| 0019 | MQTT, QoS y deduplicacion IoT | David | 24 nov | Pendiente |
+
+## Observaciones
+
+- El ADR-0004 existente documenta el control de concurrencia
+  en movimientos. Su tema difiere del cronograma original.
+  Se debe acordar su correspondencia con Julian.
+- Los ADR pendientes deben ser escritos por sus responsables.
+- Los ADR desarrollados en otras ramas se enlazaran
+  cuando sean integrados.
+- No se deben eliminar decisiones anteriores sin
+  documentar su reemplazo.
+- El indice se consolidara definitivamente durante E-08.
