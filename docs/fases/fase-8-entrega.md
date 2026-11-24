@@ -4,7 +4,7 @@
 
 Separar el procesamiento de movimientos diarios de las operaciones transaccionales de las APIs de bodega. La implementación permite exportar movimientos de tres PostgreSQL, generar CSV por fecha y un manifiesto SHA-256, ejecutar un trabajo AWS Batch Fargate que produce el resumen JSON en S3 y registrar el resultado para evitar reprocesamientos de fechas completadas.
 
-**Estado al 23 de noviembre de 2026:** el flujo local de exportación PostgreSQL → S3 ha sido comprobado, y la definición AWS Batch Fargate revisión 3 ejecutó con éxito una prueba de idempotencia. La revisión 2 procesó correctamente el reporte del 22 de noviembre (1 movimiento, entrada de 100 unidades). Las mejoras más recientes del manifiesto y la corrección UTC/Colombia se probaron localmente, pero aún no se publicó y verificó en Fargate una imagen que las contenga. EventBridge Scheduler está creado, **DISABLED**. La exportación periódica sin un equipo local encendido **no está implementada**.
+**Estado al 23 de noviembre de 2026:** se verificó correctamente el flujo PostgreSQL → CSV → S3 → AWS Batch Fargate → reporte JSON en S3. La revisión 4 de `warehouse-platform-inventory` ejecutó el trabajo `37371f11-8908-488f-9ef3-d4cf1e2f0129`, correspondiente al 19 de noviembre de 2026, con estado `SUCCEEDED` y código de salida `0`. Se generó el reporte `exports/daily-movements-2026-11-19.json` y el registro `batch-runs/2026-11-19.json`, con estado `SUCCEEDED` y `attempt_count=1`. Las ocho pruebas unitarias finalizaron correctamente. EventBridge Scheduler permanece `DISABLED` porque la exportación depende de bases PostgreSQL locales.
 
 ## Arquitectura
 
@@ -74,6 +74,11 @@ Para AWS Fargate, se requiere construir y publicar la imagen actualizada en ECR,
 - AWS Batch revisión 3: SUCCEEDED, salida 0, detectó `2026-11-21` ya completado y omitió reprocesamiento.
 - Registro S3 del 22/11/2026: SUCCEEDED, attempt_count=1, s3_key correcto.
 - EventBridge Scheduler `warehouse-platform-daily-movements` configurado en `cron(0 23 * * ? *)`, `America/Bogota`, **DISABLED**.
+- AWS Batch revisión 4: ejecución real en AWS Fargate con estado `SUCCEEDED` y código de salida `0`.
+- Job ID: `37371f11-8908-488f-9ef3-d4cf1e2f0129`.
+- Fecha procesada: `2026-11-19`.
+- Reporte generado: `exports/daily-movements-2026-11-19.json`.
+- Registro de ejecución: `batch-runs/2026-11-19.json`, con `status=SUCCEEDED` y `attempt_count=1`.
 
 ## Respuestas conceptuales de la guía
 
