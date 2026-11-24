@@ -14,6 +14,9 @@ from common.rabbit import connect, consume, declare_topology
 from app import config
 from app.domain.database import SessionLocal
 from app.workers.projection import process_event
+from app.workers.outbox_relay import run_outbox_relay
+from app.workers.transfer_orchestrator import run_transfer_orchestrator
+from app.workers.saga_timer import run_saga_timer
 
 
 configure_logging("central-worker", None, config.LOG_LEVEL)
@@ -62,6 +65,33 @@ def main():
     logger.info("central_worker_database_ready")
     start_http_server(9101, addr="0.0.0.0")
 
+    relay_thread = threading.Thread(
+        target=run_outbox_relay,
+        args=(stop_event,),
+        name="central-outbox-relay",
+        daemon=True
+    )
+
+    relay_thread.start()
+
+    saga_thread = threading.Thread(
+        target=run_transfer_orchestrator,
+        args=(stop_event,),
+        name="central-saga-orchestrator",
+        daemon=True
+    )
+
+    saga_thread.start()
+
+    timer_thread = threading.Thread(
+        target=run_saga_timer,
+        args=(stop_event,),
+        name="central-saga-timer",
+        daemon=True
+    )
+
+    timer_thread.start()
+
     while not stop_event.is_set():
         connection = None
 
@@ -90,6 +120,10 @@ def main():
         finally:
             if connection is not None and connection.is_open:
                 connection.close()
+
+    relay_thread.join(timeout=5)
+    saga_thread.join(timeout=5)
+    timer_thread.join(timeout=5)
 
     logger.info("central_worker_stopped")
 
