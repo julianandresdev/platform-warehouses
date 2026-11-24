@@ -1,3 +1,6 @@
+import models
+from fastapi import Query
+from datetime import datetime
 import logging
 import secrets
 import time
@@ -223,6 +226,41 @@ def create_inventory_movement(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(error),
         )
+
+
+# Endpoints de lectura para reporte batch (issue #12). Requieren X-API-Key.
+@protected.get("/inventory", response_model=list[schemas.InventoryResponse])
+def batch_inventory(db: Session = Depends(get_db)):
+    return (
+        db.query(models.Inventory)
+        .filter(models.Inventory.warehouse_id == config.WAREHOUSE_ID)
+        .order_by(models.Inventory.product_id)
+        .all()
+    )
+
+
+@protected.get("/movements", response_model=list[schemas.MovementResponse])
+def batch_movements(
+    from_: datetime = Query(alias="from"),
+    to: datetime = Query(),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    if from_ >= to:
+        raise HTTPException(status_code=422, detail="from debe ser anterior a to")
+    return (
+        db.query(models.InventoryMovement)
+        .filter(
+            models.InventoryMovement.warehouse_id == config.WAREHOUSE_ID,
+            models.InventoryMovement.created_at >= from_.replace(tzinfo=None),
+            models.InventoryMovement.created_at < to.replace(tzinfo=None),
+        )
+        .order_by(models.InventoryMovement.created_at, models.InventoryMovement.id)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
 
 
 @protected.get(

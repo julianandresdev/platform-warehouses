@@ -1,18 +1,18 @@
 aws_region = "us-east-1"
-bucket_name = "warehouse-platform-santi-2026"
+bucket_name = "REEMPLAZAR-BUCKET-UNICO"
 project_prefix = "warehouse-platform"
 force_destroy_bucket = false
 batch_subnet_ids = [
-  "subnet-007766dbcad866597"
+  "subnet-REEMPLAZAR"
 ]
 
 batch_security_group_ids = [
-  "sg-02b4a7b90f8c87207"
+  "sg-REEMPLAZAR"
 ]
 
-batch_service_role_arn = "arn:aws:iam::140340522043:role/aws-service-role/batch.amazonaws.com/AWSServiceRoleForBatch"
+batch_service_role_arn = "arn:aws:iam::REEMPLAZAR-CUENTA:role/aws-service-role/batch.amazonaws.com/AWSServiceRoleForBatch"
 
-batch_job_role_arn       = "arn:aws:iam::140340522043:role/LabRole"
-batch_execution_role_arn = "arn:aws:iam::140340522043:role/LabRole"
+batch_job_role_arn       = "arn:aws:iam::REEMPLAZAR-CUENTA:role/LabRole"
+batch_execution_role_arn = "arn:aws:iam::REEMPLAZAR-CUENTA:role/LabRole"
 
-batch_image_uri = "140340522043.dkr.ecr.us-east-1.amazonaws.com/warehouse-platform-batch@sha256:680638e07d866bccc726195dbd02072912760084da7e7c45fe6139dfaaaba8e4"
+batch_image_uri = "REEMPLAZAR-CUENTA.dkr.ecr.us-east-1.amazonaws.com/warehouse-platform-batch:REEMPLAZAR-TAG"

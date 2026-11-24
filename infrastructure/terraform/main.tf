@@ -6,8 +6,13 @@
 
 data "aws_caller_identity" "current" {}
 
+data "aws_iam_role" "lab" {
+  count = var.create_lambda_role || var.lambda_role_arn != null ? 0 : 1
+  name  = var.lambda_existing_role_name
+}
+
 locals {
-  create_lambda_role = var.lambda_role_arn == null
+  create_lambda_role = var.create_lambda_role
 }
 
 # --------------------------------------------
@@ -99,6 +104,8 @@ data "aws_iam_policy_document" "lambda_access" {
 
     resources = [
       "${aws_s3_bucket.reports.arn}/exports/*",
+      "${aws_s3_bucket.reports.arn}/reports/*",
+      "${aws_s3_bucket.reports.arn}/metadata/reports/*",
       "${aws_s3_bucket.reports.arn}/processed/*"
     ]
   }
@@ -148,7 +155,7 @@ resource "aws_lambda_function" "export_handler" {
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
-  role = local.create_lambda_role ? aws_iam_role.lambda[0].arn : var.lambda_role_arn
+  role = local.create_lambda_role ? aws_iam_role.lambda[0].arn : (var.lambda_role_arn != null ? var.lambda_role_arn : data.aws_iam_role.lab[0].arn)
 
   runtime = "python3.12"
   handler = "handler.lambda_handler"
@@ -158,7 +165,9 @@ resource "aws_lambda_function" "export_handler" {
 
   environment {
     variables = {
-      EVENT_BUS_NAME = "default"
+      EVENT_BUS_NAME  = "default"
+      CENTRAL_API_URL = var.central_api_url
+      CENTRAL_API_KEY = var.central_api_key
     }
   }
 
@@ -199,6 +208,12 @@ resource "aws_s3_bucket_notification" "trigger" {
     lambda_function_arn = aws_lambda_function.export_handler.arn
     events              = ["s3:ObjectCreated:*"]
     filter_prefix       = "exports/"
+  }
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.export_handler.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "reports/"
+    filter_suffix       = ".json"
   }
 
   depends_on = [

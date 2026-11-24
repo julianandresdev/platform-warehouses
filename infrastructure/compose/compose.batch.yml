@@ -31,7 +31,9 @@ services:
     depends_on: [minio]
     networks: [messaging]
   batch:
-    build: ../../services/batch
+    build:
+      context: ../../services
+      dockerfile: batch/Dockerfile
     environment:
       WH001_DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh001_db:5432/platform
       WH002_DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh002_db:5432/platform
@@ -47,6 +49,28 @@ services:
       wh002_db: {condition: service_healthy}
       wh003_db: {condition: service_healthy}
       batch_metadata: {condition: service_healthy}
+      minio_init: {condition: service_completed_successfully}
+    networks: [wh001, wh002, wh003, messaging]
+  batch_report_api:
+    build:
+      context: ../../services
+      dockerfile: batch/Dockerfile
+    profiles: [storage]
+    command: ["python", "-m", "batch.daily_report"]
+    restart: "no"
+    environment:
+      WH001_API_URL: http://wh001_api:8000
+      WH002_API_URL: http://wh002_api:8000
+      WH003_API_URL: http://wh003_api:8000
+      API_KEY: ${API_KEY:-dev-api-key}
+      CENTRAL_API_URL: ${CENTRAL_API_URL:-}
+      CENTRAL_API_KEY: ${CENTRAL_API_KEY:-}
+      AWS_ACCESS_KEY_ID: ${MINIO_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_PASSWORD:-minioadmin123}
+      AWS_DEFAULT_REGION: us-east-1
+      S3_ENDPOINT_URL: http://minio:9000
+      REPORT_BUCKET: warehouse-platform-local
+    depends_on:
       minio_init: {condition: service_completed_successfully}
     networks: [wh001, wh002, wh003, messaging]
 volumes:

@@ -1,5 +1,9 @@
 
 import json
+import hashlib
+import urllib.request
+import uuid
+from datetime import date
 import logging
 import os
 from urllib.parse import unquote_plus
@@ -24,7 +28,6 @@ def validar_reporte(reporte):
     if not isinstance(fecha, str):
         raise ValueError("Falta la fecha del reporte")
 
-    from datetime import date
     try:
         date.fromisoformat(fecha)
     except ValueError as error:
@@ -160,6 +163,13 @@ def lambda_handler(event, context):
         bucket = record["s3"]["bucket"]["name"]
         key = unquote_plus(record["s3"]["object"]["key"])
 
+        if key.startswith("reports/") and key.endswith(".json"):
+            metadata = procesar_reporte_contrato(s3, bucket, key, record)
+            if metadata["status"] == "INVALID":
+                rechazados += 1
+            else:
+                procesados += 1
+            continue
         if not key.startswith("exports/") or not key.endswith(".json"):
             continue
 
@@ -231,3 +241,41 @@ def lambda_handler(event, context):
         "statusCode": 200,
         "body": json.dumps(resultado),
     }
+
+
+def procesar_reporte_contrato(s3, bucket, key, record):
+    """Contrato #29: metadata, auditoría de inválidos y registro central autenticado.
+    Fallas HTTP/S3 se propagan para permitir reintentos. `metadata/` no activa el trigger.
+    """
+    response=s3.get_object(Bucket=bucket, Key=key)
+    raw=response["Body"].read()
+    correlation=(response.get("Metadata") or {}).get("correlation-id") or str(uuid.uuid4())
+    digest=hashlib.sha256(raw).hexdigest()
+    metadata={"bucket":bucket,"key":key,"correlation_id":correlation,
+              "size_bytes":len(raw),"sha256":digest,"status":"VALID","record_count":0}
+    try:
+        obj=json.loads(raw)
+        if not isinstance(obj,dict):raise ValueError("El reporte debe ser un objeto JSON")
+        if not obj.get("report_date"):raise ValueError("Falta report_date")
+        records=obj.get("movements")
+        if records is None:
+            records=obj.get("total_movements")
+        if isinstance(records,list):metadata["record_count"]=len(records)
+        elif type(records)==int and records>=0:metadata["record_count"]=records
+        elif isinstance(obj.get("warehouses"),dict):
+            metadata["record_count"]=sum(len(v.get("movements",[])) for v in obj["warehouses"].values())
+        else:raise ValueError("No se puede calcular el número de registros")
+    except (ValueError,TypeError,KeyError) as exc:
+        metadata["status"]="INVALID";metadata["reason"]=str(exc)
+    path="metadata/"+key
+    s3.put_object(Bucket=bucket,Key=path,Body=json.dumps(metadata,ensure_ascii=False).encode(),ContentType="application/json")
+    api=os.environ.get("CENTRAL_API_URL","").rstrip("/")
+    secret=os.environ.get("CENTRAL_API_KEY","")
+    if not api or not secret:
+        raise RuntimeError("CENTRAL_API_URL y CENTRAL_API_KEY son obligatorios para registrar reportes")
+    req=urllib.request.Request(api+"/internal/reports",data=json.dumps(metadata).encode(),
+        headers={"Content-Type":"application/json","X-API-Key":secret,"X-Correlation-ID":correlation},method="POST")
+    with urllib.request.urlopen(req,timeout=10) as result:
+        if result.status>=300:raise RuntimeError("Registro central rechazado")
+    logger.info("Reporte %s: %s, correlation-id=%s, metadata=%s",metadata["status"],key,correlation,path)
+    return metadata

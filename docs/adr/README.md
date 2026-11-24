@@ -14,3 +14,5 @@ La plantilla la agrega Esteban (E-01).
 | [0005](0005-topologia-rabbitmq.md) | Topología de RabbitMQ y entrega confirmada | David |
 | [0006](0006-patron-outbox.md) | Publicación de eventos con outbox transaccional | David |
 | [0008](0008-cache-aside-con-redis.md) | Cache Aside con Redis e invalidación síncrona | Julian |
+| [0014](0014-batch-csv-s3.md) | Exportación CSV y manifiesto S3 (propuesta, no aprobada) | Equipo |
+| [0017](0017-lambda-validacion-eventos.md) | Lambda, validación y EventBridge (propuesta, no aprobada) | Equipo |

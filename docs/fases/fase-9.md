@@ -70,7 +70,7 @@ Incluye:
 - Notificación `ObjectCreated` para `exports/`.
 - Permisos de lectura de S3 y publicación en EventBridge cuando Terraform crea el rol IAM.
 
-La infraestructura AWS Batch se gestiona por separado mediante AWS CLI y scripts del proyecto.
+La infraestructura AWS Batch está descrita en `infrastructure/terraform/batch.tf`; su importación y reconciliación tienen limitaciones documentadas en `docs/fases/terraform-aws-entrega.md`.
 
 ## 6. Pruebas realizadas
 
@@ -96,15 +96,11 @@ Se ejecutaron cinco pruebas correctamente:
 - Resultado: `processed = 0`, `rejected = 1`.
 - El reporte fue rechazado sin publicar un evento.
 
-## 7. Limitaciones
+## 7. Estado real de integración y contrato
 
-Se creó y habilitó la regla EventBridge `warehouse-platform-report-created` para eventos `InventoryReportCreated`.
+La regla EventBridge, el destino CloudWatch y su política de acceso se encuentran en `infrastructure/terraform/eventbridge.tf`. El 24 de noviembre de 2026 se probó la entrega a CloudWatch con el evento del objeto `exports/phase9-integracion-final.json`. Evidencia: `evidencias/fase-9/lambda-integracion-final.txt` y `evidencias/fase-9/eventbridge-integracion-final.txt`.
 
-Sin embargo, la política IAM de AWS Academy `voc-cancel-cred` deniega explícitamente las operaciones `events:PutTargets` y `events:ListTargetsByRule`.
-
-Por tanto, se verificó que EventBridge aceptó la publicación, pero no se pudo verificar la entrega a un consumidor.
-
-Esta limitación no impidió comprobar el funcionamiento principal de Lambda.
+Este flujo implementa validación y eventos, pero **no completa el contrato del issue #29**: se agregaron las rutas de metadata y el POST autenticado con correlation ID, pero faltan las pruebas reales contra la API central y MinIO. No se debe cerrar #29 sin esos criterios, salvo aceptación explícita de otro diseño. Ver `docs/adr/0017-lambda-validacion-eventos.md`.
 
 ## 8. Comparación de tecnologías
 
@@ -124,4 +120,4 @@ Se implementó y probó el flujo S3 → AWS Lambda → EventBridge.
 
 La función valida los reportes de inventario, rechaza información inconsistente, genera un resumen y publica eventos para permitir futuras integraciones.
 
-La funcionalidad principal de la fase 9 está comprobada. La entrega del evento a un consumidor permanece sin verificar debido a restricciones de IAM del laboratorio.
+La ruta S3 → Lambda → EventBridge → CloudWatch está comprobada con evidencia real; la conformidad con el contrato de #29 permanece parcial.
