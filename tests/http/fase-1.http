@@ -1,0 +1,151 @@
+# Fase 1 - Warehouse Cloud Platform
+# E-02: coleccion de pruebas HTTP.
+#
+# Ejecutar en orden sobre una bodega de desarrollo.
+# Utilizar un SKU nuevo para repetir la coleccion.
+
+@baseUrl = http://localhost:8000
+@apiKey = dev-api-key
+@sku = E02-HTTP-001
+
+
+### 1.1 Health check - Esperado: 200
+GET {{baseUrl}}/health
+
+
+### 1.2 Readiness - Esperado: 200
+GET {{baseUrl}}/health/ready
+
+
+### 2. Sin API key - Esperado: 401
+GET {{baseUrl}}/products
+
+
+### 3.1 Crear producto - Esperado: 201
+# @name createProduct
+POST {{baseUrl}}/products
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+    "sku": "{{sku}}",
+    "name": "Laptop Lenovo",
+    "description": "Producto de prueba E-02",
+    "category": "Tecnologia",
+    "unit": "unidad"
+}
+
+
+### 3.2 SKU duplicado - Esperado: 409
+POST {{baseUrl}}/products
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+    "sku": "{{sku}}",
+    "name": "Laptop duplicada",
+    "unit": "unidad"
+}
+
+
+### 4.1 Listar productos - Esperado: 200
+GET {{baseUrl}}/products
+X-API-Key: {{apiKey}}
+
+
+### 4.2 Consultar producto - Esperado: 200
+GET {{baseUrl}}/products/{{createProduct.response.body.$.id}}
+X-API-Key: {{apiKey}}
+
+
+### 5. Actualizar producto - Esperado: 200
+PUT {{baseUrl}}/products/{{createProduct.response.body.$.id}}
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+    "name": "Laptop Lenovo ThinkPad",
+    "category": "Computadores"
+}
+
+
+### 6. Registrar entrada - Esperado: 201
+POST {{baseUrl}}/inventory/movements
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+    "sku": "{{sku}}",
+    "type": "RECEIPT",
+    "quantity": 10,
+    "reference": "ENTRADA-E02"
+}
+
+
+### 7. Consultar inventario - Esperado: 10 unidades
+GET {{baseUrl}}/inventory/{{sku}}
+X-API-Key: {{apiKey}}
+
+
+### 8. Registrar salida - Esperado: 201
+POST {{baseUrl}}/inventory/movements
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+    "sku": "{{sku}}",
+    "type": "SHIPMENT",
+    "quantity": 4,
+    "reference": "SALIDA-E02"
+}
+
+
+### 8.1 Verificar stock - Esperado: 6 unidades
+GET {{baseUrl}}/inventory/{{sku}}
+X-API-Key: {{apiKey}}
+
+
+### 9. Stock insuficiente - Esperado: 409
+POST {{baseUrl}}/inventory/movements
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+    "sku": "{{sku}}",
+    "type": "SHIPMENT",
+    "quantity": 15,
+    "reference": "SALIDA-INVALIDA-E02"
+}
+
+
+### 9.1 Verificar rollback - Esperado: 6 unidades
+GET {{baseUrl}}/inventory/{{sku}}
+X-API-Key: {{apiKey}}
+
+
+### 10. Ajuste fisico - Esperado: 201, diferencia -1
+POST {{baseUrl}}/inventory/movements
+X-API-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+    "sku": "{{sku}}",
+    "type": "ADJUSTMENT",
+    "quantity": 5,
+    "reference": "CONTEO-E02"
+}
+
+
+### 10.1 Verificar ajuste - Esperado: 5 unidades
+GET {{baseUrl}}/inventory/{{sku}}
+X-API-Key: {{apiKey}}
+
+
+### 11. Historial - Esperado: 3 movimientos
+GET {{baseUrl}}/inventory/{{sku}}/movements
+X-API-Key: {{apiKey}}
+
+
+### 12. Eliminar producto con movimientos - Esperado: 409
+DELETE {{baseUrl}}/products/{{createProduct.response.body.$.id}}
+X-API-Key: {{apiKey}}
