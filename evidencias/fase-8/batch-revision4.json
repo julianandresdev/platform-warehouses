@@ -1,0 +1,9 @@
+﻿[
+    {
+        "JobId": "37371f11-8908-488f-9ef3-d4cf1e2f0129",
+        "JobName": "warehouse-daily-20261119",
+        "Status": "SUCCEEDED",
+        "JobDefinition": "arn:aws:batch:us-east-1:140340522043:job-definition/warehouse-platform-inventory:4",
+        "ExitCode": 0
+    }
+]

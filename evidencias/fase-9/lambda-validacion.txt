@@ -1,0 +1,15 @@
+﻿INIT_START Runtime Version: python:3.12.mainlinev2.v86	Runtime Version ARN: arn:aws:lambda:us-east-1::runtime:9d15a516fef11563a8c452bd8d3fe5a5a120b73013e74783e925235557467534
+	START RequestId: c9ce23b9-a58d-4374-aeb6-bde545ec3409 Version: $LATEST
+	[INFO]	2026-11-24T00:21:00.051Z	c9ce23b9-a58d-4374-aeb6-bde545ec3409	Found credentials in environment variables.
+	[INFO]	2026-11-24T00:21:02.670Z	c9ce23b9-a58d-4374-aeb6-bde545ec3409	Validando reporte s3://warehouse-platform-santi-2026/exports/phase9-test-20261123192057.json
+	[INFO]	2026-11-24T00:21:03.225Z	c9ce23b9-a58d-4374-aeb6-bde545ec3409	Reporte valido y evento publicado: fecha=2026-11-19, movimientos=0
+	[INFO]	2026-11-24T00:21:03.226Z	c9ce23b9-a58d-4374-aeb6-bde545ec3409	Resultado Lambda: {"processed": 1, "rejected": 0}
+	END RequestId: c9ce23b9-a58d-4374-aeb6-bde545ec3409
+	REPORT RequestId: c9ce23b9-a58d-4374-aeb6-bde545ec3409	Duration: 3421.59 ms	Billed Duration: 3757 ms	Memory Size: 128 MB	Max Memory Used: 94 MB	Init Duration: 334.92 ms	
+	START RequestId: ccb6f9f2-75bc-4622-b17a-d38d3054d677 Version: $LATEST
+	[INFO]	2026-11-24T00:22:20.691Z	ccb6f9f2-75bc-4622-b17a-d38d3054d677	Validando reporte s3://warehouse-platform-santi-2026/exports/phase9-invalid-20261123192218.json
+	[ERROR]	2026-11-24T00:22:20.949Z	ccb6f9f2-75bc-4622-b17a-d38d3054d677	Reporte rechazado: s3://warehouse-platform-santi-2026/exports/phase9-invalid-20261123192218.json - El reporte debe incluir las tres bodegas
+	[INFO]	2026-11-24T00:22:20.949Z	ccb6f9f2-75bc-4622-b17a-d38d3054d677	Resultado Lambda: {"processed": 0, "rejected": 1}
+	END RequestId: ccb6f9f2-75bc-4622-b17a-d38d3054d677
+	REPORT RequestId: ccb6f9f2-75bc-4622-b17a-d38d3054d677	Duration: 464.41 ms	Billed Duration: 465 ms	Memory Size: 128 MB	Max Memory Used: 94 MB	
+
