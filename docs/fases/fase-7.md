@@ -24,6 +24,35 @@
 - Worker: inicio, conexión y reinicio exitosos.
 
 ### Pendiente
-- E-04: Proyección CQRS desde RabbitMQ.
 - E-05: Consultas globales y comparación con fanout.
 - E-06: Orquestación Saga.
+
+## E-04: Proyección CQRS y endpoints globales
+
+### Implementación
+- Worker central consumidor de RabbitMQ: central.projection.
+- Upsert de inventario con control de versión.
+- Idempotencia mediante processed_messages.
+- Heartbeats y detección stale después de 90 segundos.
+- GET /global/warehouses.
+- GET /global/inventory/{sku}.
+- GET /global/inventory con paginación.
+- Métrica projection_lag_seconds expuesta en puerto interno 9101.
+
+### Evidencia
+- Proyección de INVENTORY_UPDATED comprobada en PostgreSQL.
+- Versiones antiguas descartadas.
+- Mismo event_id publicado dos veces y procesado una vez.
+- Heartbeat registrado correctamente.
+- Endpoint por SKU: HTTP 200, cantidades consolidadas.
+- SKU inexistente: HTTP 404.
+- Endpoint protegido: HTTP 401 sin API Key.
+- Pruebas de paginación y bodega WH-002 pendientes de verificación final.
+
+### Preguntas del profesor
+- ¿Por qué CQRS? Para separar el modelo de lectura de las escrituras.
+- ¿Qué ocurre si una bodega cae? La consulta sigue respondiendo,
+  pero marca como stale los datos de esa bodega.
+- ¿Cómo se evitan inconsistencias? Con versiones e idempotencia.
+
+Decisión arquitectónica: [ADR-0012](../adr/0012-proyeccion-cqrs.md).

@@ -1,3 +1,4 @@
 fastapi[standard]
 sqlalchemy>=2,<3
 psycopg2-binary
+prometheus-client>=0.20,<1
