@@ -43,9 +43,10 @@ resource "aws_batch_job_queue" "warehouse_queue" {
 # 3. Definicion del trabajo
 
 resource "aws_batch_job_definition" "warehouse_inventory" {
-  name                  = "warehouse-platform-inventory"
-  type                  = "container"
-  platform_capabilities = ["FARGATE"]
+  name                       = "warehouse-platform-inventory"
+  type                       = "container"
+  platform_capabilities      = ["FARGATE"]
+  deregister_on_new_revision = false
 
   container_properties = jsonencode({
     image = "140340522043.dkr.ecr.us-east-1.amazonaws.com/warehouse-platform-batch@sha256:680638e07d866bccc726195dbd02072912760084da7e7c45fe6139dfaaaba8e4"

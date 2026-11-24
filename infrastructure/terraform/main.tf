@@ -173,6 +173,7 @@ resource "aws_lambda_function" "export_handler" {
   }
 }
 
+
 # --------------------------------------------
 # Permitir invocación desde S3
 # --------------------------------------------
