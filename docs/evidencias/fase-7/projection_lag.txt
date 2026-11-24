@@ -1,0 +1,3 @@
+projection_lag_seconds{warehouse_id="WH-001"} 0.346916
+projection_lag_seconds{warehouse_id="WH-003"} 0.323441
+projection_lag_seconds{warehouse_id="WH-002"} 0.430346
