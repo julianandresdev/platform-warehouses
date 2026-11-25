@@ -1,0 +1,2 @@
+CONTAINER ID   IMAGE                             COMMAND                  CREATED        STATUS                              PORTS     NAMES
+f1342f0b1e0c   rabbitmq:3.13-management-alpine   "docker-entrypoint.s…"   16 hours ago   Exited (0) Less than a second ago             e07-rabbitmq-1

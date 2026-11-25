@@ -1,0 +1,5 @@
+Intento: 1
+2026-11-25T14:17:35-05:00
+{"sku":"P-001","mode":"fanout","total_quantity":190,"total_reserved":0,"total_available":190,"as_of":"2026-11-25T19:17:35.260087+00:00","partial":false,"unavailable":[],"not_found":[],"warehouses":[{"warehouse_id":"WH-001","quantity":100,"reserved_quantity":0,"available_quantity":100,"version":1,"updated_at":"2026-11-25T03:24:43.261380","stale":false},{"warehouse_id":"WH-002","quantity":35,"reserved_quantity":0,"available_quantity":35,"version":3,"updated_at":"2026-11-25T03:38:28.921693","stale":false},{"warehouse_id":"WH-003","quantity":55,"reserved_quantity":0,"available_quantity":55,"version":1,"updated_at":"2026-11-25T03:24:44.532995","stale":false}]}
+HTTP: 200
+Tiempo: 0.186191 s

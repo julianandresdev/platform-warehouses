@@ -1,0 +1,2 @@
+CONTAINER ID   IMAGE           COMMAND                  CREATED        STATUS                              PORTS     NAMES
+904c3b71292b   e07-wh003_api   "uvicorn app:app --h…"   16 hours ago   Exited (0) Less than a second ago             e07-wh003_api-1
