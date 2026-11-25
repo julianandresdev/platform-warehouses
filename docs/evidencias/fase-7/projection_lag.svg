@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="270">
+<rect width="760" height="270" fill="white"/>
+<g font-family="Arial" fill="#111827">
+<text x="25" y="30" font-size="20">Retraso de proyeccion CQRS</text>
+<text x="25" y="85">WH-001</text>
+<rect x="130" y="65" width="333.03936" height="28" fill="#2563eb"/>
+<text x="473.03936" y="85">346.92 ms</text>
+<text x="25" y="140">WH-002</text>
+<rect x="130" y="120" width="413.13216" height="28" fill="#2563eb"/>
+<text x="553.13216" y="140">430.35 ms</text>
+<text x="25" y="195">WH-003</text>
+<rect x="130" y="175" width="310.50336" height="28" fill="#2563eb"/>
+<text x="450.50336" y="195">323.44 ms</text>
+<text x="25" y="250" font-size="12">Ultima captura de la metrica projection_lag_seconds</text>
+</g></svg>
