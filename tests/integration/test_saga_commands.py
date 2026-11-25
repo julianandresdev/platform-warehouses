@@ -290,6 +290,58 @@ def test_reserve_stock_respects_deadline(db):
     assert db.inventory(sku) == (100, 0)
 
 
+def test_reserve_stock_deadline_is_checked_after_waiting_for_the_lock(db):
+    """La espera del FOR UPDATE cuenta contra el deadline.
+
+    Otra transacción mantiene bloqueada la fila de inventario más tiempo que el
+    margen del deadline. Si la hora se tomara antes de bloquear, el comando vería
+    un deadline todavía vigente y reservaría con la fecha vencida.
+    """
+
+    import threading
+    import time
+
+    from sqlalchemy import text
+
+    sku = db.product({SOURCE: 100})
+    message = db.command(
+        "RESERVE_STOCK",
+        sku,
+        30,
+        deadline=datetime.now(timezone.utc) + timedelta(seconds=1),
+    )
+    transfer_id = message["payload"]["transfer_id"]
+    holding = threading.Event()
+    outcomes: list = []
+
+    def competing_transaction() -> None:
+        with db.session_factory() as session, session.begin():
+            session.execute(
+                text(
+                    "SELECT 1 FROM inventory WHERE product_id = "
+                    "(SELECT id FROM products WHERE sku = :sku) FOR UPDATE"
+                ),
+                {"sku": sku},
+            )
+            holding.set()
+            time.sleep(2)
+
+    holder = threading.Thread(target=competing_transaction)
+    holder.start()
+    assert holding.wait(timeout=10)
+    worker = threading.Thread(target=lambda: outcomes.append(run(db, message)))
+    worker.start()
+    worker.join(timeout=15)
+    holder.join(timeout=15)
+
+    assert not worker.is_alive()
+    (outcome,) = outcomes
+    assert outcome.response_type == "STOCK_RESERVATION_FAILED"
+    assert outcome.reason == "DEADLINE_EXCEEDED"
+    assert db.inventory(sku) == (100, 0)
+    assert db.movements(transfer_id) == []
+
+
 def test_reserve_stock_unknown_sku_fails(db):
     message = db.command("RESERVE_STOCK", f"NOPE-{uuid.uuid4().hex[:8]}", 5)
 
@@ -350,16 +402,56 @@ def test_ship_transfer_consumes_reservation(db):
     assert db.movements(transfer_id) == [("RESERVATION", 30), ("TRANSFER_OUT", 30)]
 
 
-def test_ship_without_reservation_is_rejected(db):
+def test_ship_without_reservation_emits_ship_failed(db):
     sku = db.product({SOURCE: 100})
     message = db.command("SHIP_TRANSFER", sku, 30)
+    transfer_id = message["payload"]["transfer_id"]
+
+    outcome = run(db, message)
+    duplicate = run(db, message)
+
+    assert outcome.status == "processed"
+    assert outcome.response_type == "TRANSFER_SHIP_FAILED"
+    assert outcome.reason == "NO_ACTIVE_RESERVATION"
+    assert outcome.events == ["TRANSFER_SHIP_FAILED"]
+    assert duplicate.status == "duplicate"
+    assert db.inventory(sku) == (100, 0)
+    assert db.movements(transfer_id) == []
+    assert db.processed(message["event_id"]) == 1
+    (failed,) = db.outbox(transfer_id, sku)
+    assert failed["routing_key"] == f"warehouse.{SOURCE}.transfer.transfer_ship_failed"
+    assert failed["correlation_id"] == message["correlation_id"]
+    assert failed["payload"] == {
+        "transfer_id": transfer_id,
+        "warehouse_id": SOURCE,
+        "sku": sku,
+        "quantity": 30,
+        "reason": "NO_ACTIVE_RESERVATION",
+    }
+
+
+def test_ship_after_release_emits_ship_failed(db):
+    sku = db.product({SOURCE: 100})
+    reserve = db.command("RESERVE_STOCK", sku, 30)
+    transfer_id = reserve["payload"]["transfer_id"]
+    run(db, reserve)
+    run(db, db.command("RELEASE_RESERVATION", sku, 30, transfer_id=transfer_id))
+
+    outcome = run(db, db.command("SHIP_TRANSFER", sku, 30, transfer_id=transfer_id))
+
+    assert outcome.response_type == "TRANSFER_SHIP_FAILED"
+    assert outcome.reason == "NO_ACTIVE_RESERVATION"
+    assert db.inventory(sku) == (100, 0)
+    assert db.movements(transfer_id) == [("RESERVATION", 30), ("RESERVATION_RELEASE", 30)]
+
+
+def test_ship_unknown_sku_emits_ship_failed(db):
+    message = db.command("SHIP_TRANSFER", f"NOPE-{uuid.uuid4().hex[:8]}", 5)
 
     outcome = run(db, message)
 
-    assert outcome.status == "rejected"
-    assert outcome.events == []
-    assert db.inventory(sku) == (100, 0)
-    assert db.processed(message["event_id"]) == 1
+    assert outcome.response_type == "TRANSFER_SHIP_FAILED"
+    assert outcome.reason == "SKU_NOT_FOUND"
 
 
 # -------------------------

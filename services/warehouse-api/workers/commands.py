@@ -57,10 +57,15 @@ RETURN_STOCK = "RETURN_STOCK"
 REASON_DEADLINE_EXCEEDED = "DEADLINE_EXCEEDED"
 REASON_INSUFFICIENT_STOCK = "INSUFFICIENT_STOCK"
 REASON_SKU_NOT_FOUND = "SKU_NOT_FOUND"
+REASON_NO_ACTIVE_RESERVATION = "NO_ACTIVE_RESERVATION"
 
 CHAOS_STEPS = ("before_commit", "after_commit")
 
 M = models.MovementType
+
+# Reloj inyectable. Los pasos lo invocan en el momento exacto en que lo necesitan
+# (p. ej. RESERVE_STOCK, después de tomar el lock del inventario) y no antes.
+Clock = Callable[[], datetime]
 
 
 class InvalidCommandError(ValueError):
@@ -299,7 +304,7 @@ def _record(
 
 
 def _reserve_stock(
-    session: Session, command: Command, warehouse_id: str, now: datetime
+    session: Session, command: Command, warehouse_id: str, now: Clock
 ) -> StepResult:
     failed = "STOCK_RESERVATION_FAILED"
     product = _product(session, command.sku)
@@ -312,7 +317,10 @@ def _reserve_stock(
         if M.RESERVATION in steps:
             return StepResult("STOCK_RESERVED", note="reserva ya aplicada")
 
-    if command.deadline is not None and now >= command.deadline:
+    # La hora se toma AQUÍ, con el lock del inventario ya adquirido: si el comando
+    # esperó el FOR UPDATE detrás de otra transacción, esa espera cuenta contra el
+    # deadline. Tomarla antes de bloquear dejaba reservar con la fecha vencida.
+    if command.deadline is not None and now() >= command.deadline:
         return StepResult(failed, reason=REASON_DEADLINE_EXCEEDED)
     if inventory is None or inventory.available_quantity < command.quantity:
         return StepResult(failed, reason=REASON_INSUFFICIENT_STOCK)
@@ -323,7 +331,7 @@ def _reserve_stock(
 
 
 def _release_reservation(
-    session: Session, command: Command, warehouse_id: str, now: datetime
+    session: Session, command: Command, warehouse_id: str, now: Clock
 ) -> StepResult:
     released = "RESERVATION_RELEASED"
     product = _product(session, command.sku)
@@ -344,22 +352,27 @@ def _release_reservation(
 
 
 def _ship_transfer(
-    session: Session, command: Command, warehouse_id: str, now: datetime
+    session: Session, command: Command, warehouse_id: str, now: Clock
 ) -> StepResult:
     shipped = "TRANSFER_SHIPPED"
+    failed = "TRANSFER_SHIP_FAILED"
     product = _product(session, command.sku)
-    inventory = _lock_inventory(session, product.id, warehouse_id) if product else None
+    if product is None:
+        return StepResult(failed, reason=REASON_SKU_NOT_FOUND)
+    inventory = _lock_inventory(session, product.id, warehouse_id)
     if inventory is None:
-        return StepResult(None, note="sku sin inventario en la bodega origen")
+        return StepResult(failed, reason=REASON_NO_ACTIVE_RESERVATION)
 
     steps = _applied_steps(session, product.id, warehouse_id, command.reference)
     if M.TRANSFER_OUT in steps:
         return StepResult(shipped, note="salida ya aplicada")
     reserved = _active_reservation(steps)
     if reserved == 0:
-        # No hay evento de fallo para el envío en el contrato: se registra el
-        # comando, se deja traza en el log y la central lo verá como pendiente.
-        return StepResult(None, note="sin reserva activa para despachar")
+        # Nada que despachar (reserva inexistente, liberada o vencida): la central
+        # recibe TRANSFER_SHIP_FAILED y compensa en vez de quedarse esperando.
+        return StepResult(
+            failed, reason=REASON_NO_ACTIVE_RESERVATION, note="sin reserva activa"
+        )
 
     inventory.quantity -= reserved
     inventory.reserved_quantity -= reserved
@@ -368,7 +381,7 @@ def _ship_transfer(
 
 
 def _receive_transfer(
-    session: Session, command: Command, warehouse_id: str, now: datetime
+    session: Session, command: Command, warehouse_id: str, now: Clock
 ) -> StepResult:
     product = _product(session, command.sku)
     if product is None:
@@ -386,7 +399,7 @@ def _receive_transfer(
 
 
 def _return_stock(
-    session: Session, command: Command, warehouse_id: str, now: datetime
+    session: Session, command: Command, warehouse_id: str, now: Clock
 ) -> StepResult:
     returned = "STOCK_RETURNED"
     product = _product(session, command.sku)
@@ -414,7 +427,7 @@ def _return_stock(
     return StepResult(returned, note="nada que devolver")
 
 
-StepHandler = Callable[[Session, Command, str, datetime], StepResult]
+StepHandler = Callable[[Session, Command, str, Clock], StepResult]
 
 HANDLERS: dict[str, StepHandler] = {
     RESERVE_STOCK: _reserve_stock,
@@ -489,7 +502,7 @@ def handle_command(
     *,
     session_factory: sessionmaker[Session] | None = None,
     warehouse_id: str | None = None,
-    now: Callable[[], datetime] | None = None,
+    now: Clock | None = None,
     chaos: str | None = None,
 ) -> Outcome:
     """Procesa un comando. Retorna normalmente => el consumidor hace ack.
@@ -546,7 +559,7 @@ def handle_command(
                 logger.info("command_duplicate", extra=log_extra)
                 return Outcome("duplicate", command_type=command.event_type)
 
-            result = HANDLERS[command.event_type](session, command, warehouse_id, now())
+            result = HANDLERS[command.event_type](session, command, warehouse_id, now)
             session.flush()
             events = _enqueue_events(session, command, result, warehouse_id)
             chaos_point(command.event_type, "before_commit", chaos)

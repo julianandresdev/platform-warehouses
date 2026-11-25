@@ -45,7 +45,7 @@ Cantidades del ejemplo 100/20 → 70/50 (30 unidades de WH-001 a WH-002).
 | --- | --- | --- | --- | --- |
 | `RESERVE_STOCK` | origen | `reserved += q` (100/0 → 100/30) si `now < deadline` y `disponible ≥ q` | `RESERVATION` | `STOCK_RESERVED` o `STOCK_RESERVATION_FAILED` (`DEADLINE_EXCEEDED`, `INSUFFICIENT_STOCK`, `SKU_NOT_FOUND`) |
 | `RELEASE_RESERVATION` | origen | `reserved -= q` si la reserva sigue activa | `RESERVATION_RELEASE` | `RESERVATION_RELEASED` (también si no había nada que liberar) |
-| `SHIP_TRANSFER` | origen | `quantity -= q`, `reserved -= q` (100/30 → 70/0) | `TRANSFER_OUT` | `TRANSFER_SHIPPED` |
+| `SHIP_TRANSFER` | origen | `quantity -= q`, `reserved -= q` (100/30 → 70/0) | `TRANSFER_OUT` | `TRANSFER_SHIPPED` o `TRANSFER_SHIP_FAILED` (`NO_ACTIVE_RESERVATION`, `SKU_NOT_FOUND`) |
 | `RECEIVE_TRANSFER` | destino | `quantity += q` (20 → 50); crea la fila si no existía | `TRANSFER_IN` | `TRANSFER_RECEIVED` o `TRANSFER_RECEIVE_FAILED` (`SKU_NOT_FOUND`, falla permanente) |
 | `RETURN_STOCK` | origen | `quantity += q` (70 → 100) si hubo salida; si solo había reserva, la libera | `TRANSFER_RETURN` (o `RESERVATION_RELEASE`) | `STOCK_RETURNED` |
 
@@ -64,10 +64,15 @@ Las decisiones y alternativas están en
 
 ### Casos límite
 
-- `SHIP_TRANSFER` sin reserva activa: el contrato no tiene evento de fallo de envío.
-  El comando se registra, se loguea `command_rejected` (nivel ERROR) y no se emite
-  respuesta; la central lo verá como pendiente. Es el mismo punto abierto que E-06
-  lista como "tratamiento del fallo definitivo de envío".
+- `SHIP_TRANSFER` sin reserva activa (nunca existió, ya se liberó o el SKU no existe):
+  no mueve inventario y responde `TRANSFER_SHIP_FAILED` con `reason`
+  `NO_ACTIVE_RESERVATION` o `SKU_NOT_FOUND`, para que la central compense en vez de
+  quedarse esperando en `SOURCE_RESERVED`. Es la respuesta al punto que E-06 lista
+  como "tratamiento del fallo definitivo de envío"; la central debe consumir el
+  evento (ver `docs/events.md`).
+- `RESERVE_STOCK` y el deadline: la hora se toma después de bloquear la fila de
+  inventario. Si el comando esperó el `FOR UPDATE` detrás de otra transacción, esa
+  espera cuenta contra el deadline.
 - Comandos inválidos (sobre mal formado, payload incompleto, `warehouse_id` de otra
   bodega): se loguean `command_invalid` / `command_wrong_warehouse` y se confirman
   para no ciclar. Con D-05 deberán ir a la DLQ.

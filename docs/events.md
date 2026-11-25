@@ -67,6 +67,7 @@ En las tablas, `WH` representa un identificador de bodega como `WH-001`. Las cla
 | `STOCK_RESERVATION_FAILED` | Bodega / `warehouse.events` | `warehouse.WH.transfer.stock_reservation_failed` | `transfer_id: string (UUID)`, `warehouse_id: string`, `sku: string`, `quantity: integer`, `reason: string` | Orquestador central, auditoría | Igual que los demás resultados de transferencia. |
 | `RESERVATION_RELEASED` | Bodega / `warehouse.events` | `warehouse.WH.transfer.reservation_released` | `transfer_id: string (UUID)`, `warehouse_id: string`, `sku: string`, `quantity: integer` | Orquestador central, auditoría | Igual que los demás resultados de transferencia. |
 | `TRANSFER_SHIPPED` | Bodega / `warehouse.events` | `warehouse.WH.transfer.transfer_shipped` | `transfer_id: string (UUID)`, `warehouse_id: string`, `sku: string`, `quantity: integer` | Orquestador central, auditoría | Igual que los demás resultados de transferencia. |
+| `TRANSFER_SHIP_FAILED` | Bodega / `warehouse.events` | `warehouse.WH.transfer.transfer_ship_failed` | `transfer_id: string (UUID)`, `warehouse_id: string`, `sku: string`, `quantity: integer`, `reason: string` | Orquestador central, auditoría | Igual que los demás resultados de transferencia. |
 | `TRANSFER_RECEIVED` | Bodega / `warehouse.events` | `warehouse.WH.transfer.transfer_received` | `transfer_id: string (UUID)`, `warehouse_id: string`, `sku: string`, `quantity: integer` | Orquestador central, auditoría | Igual que los demás resultados de transferencia. |
 | `TRANSFER_RECEIVE_FAILED` | Bodega / `warehouse.events` | `warehouse.WH.transfer.transfer_receive_failed` | `transfer_id: string (UUID)`, `warehouse_id: string`, `sku: string`, `quantity: integer`, `reason: string` | Orquestador central, auditoría | Igual que los demás resultados de transferencia. |
 | `STOCK_RETURNED` | Bodega / `warehouse.events` | `warehouse.WH.transfer.stock_returned` | `transfer_id: string (UUID)`, `warehouse_id: string`, `sku: string`, `quantity: integer` | Orquestador central, auditoría | Igual que los demás resultados de transferencia. |
@@ -85,11 +86,11 @@ Los comandos salen de la central por `warehouse.commands` con routing key igual 
 | --- | --- | --- | --- | --- |
 | `RESERVE_STOCK` | Bodega origen | `STOCK_RESERVED` o `STOCK_RESERVATION_FAILED` | Worker de comandos de la bodega | Registrar `(event_id, consumer)` junto con la reserva. |
 | `RELEASE_RESERVATION` | Bodega origen | `RESERVATION_RELEASED` | Worker de comandos de la bodega | Registrar comando y liberación en una transacción. |
-| `SHIP_TRANSFER` | Bodega origen | `TRANSFER_SHIPPED` | Worker de comandos de la bodega | Registrar comando junto con la salida de stock. |
+| `SHIP_TRANSFER` | Bodega origen | `TRANSFER_SHIPPED` o `TRANSFER_SHIP_FAILED` | Worker de comandos de la bodega | Registrar comando junto con la salida de stock. |
 | `RECEIVE_TRANSFER` | Bodega destino | `TRANSFER_RECEIVED` o `TRANSFER_RECEIVE_FAILED` | Worker de comandos de la bodega | Registrar comando junto con la entrada de stock. |
 | `RETURN_STOCK` | Bodega origen | `STOCK_RETURNED` | Worker de comandos de la bodega | Registrar comando junto con el movimiento compensatorio. |
 
-Valores de `reason` que emite la bodega (J-07): `STOCK_RESERVATION_FAILED` usa `DEADLINE_EXCEEDED`, `INSUFFICIENT_STOCK` o `SKU_NOT_FOUND`; `TRANSFER_RECEIVE_FAILED` usa `SKU_NOT_FOUND`. Cada paso que cambia el inventario emite también `INVENTORY_UPDATED` con `movement_type` igual a `RESERVATION`, `RESERVATION_RELEASE`, `TRANSFER_OUT`, `TRANSFER_IN` o `TRANSFER_RETURN`. El detalle está en [distributed-transactions.md](distributed-transactions.md).
+Valores de `reason` que emite la bodega (J-07): `STOCK_RESERVATION_FAILED` usa `DEADLINE_EXCEEDED`, `INSUFFICIENT_STOCK` o `SKU_NOT_FOUND`; `TRANSFER_SHIP_FAILED` usa `NO_ACTIVE_RESERVATION` (no hay reserva que despachar: nunca existió, ya se liberó o ya se devolvió) o `SKU_NOT_FOUND`; `TRANSFER_RECEIVE_FAILED` usa `SKU_NOT_FOUND`. Cada paso que cambia el inventario emite también `INVENTORY_UPDATED` con `movement_type` igual a `RESERVATION`, `RESERVATION_RELEASE`, `TRANSFER_OUT`, `TRANSFER_IN` o `TRANSFER_RETURN`. El detalle está en [distributed-transactions.md](distributed-transactions.md).
 
 ## Colas y bindings
 

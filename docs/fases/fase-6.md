@@ -52,6 +52,7 @@ solo vuelve a emitir la respuesta (ADR-0014).
 
 ### Pendiente
 
-- `SHIP_TRANSFER` sin reserva activa no tiene evento de fallo en el contrato; hoy se
-  registra y se loguea como `command_rejected`. Acordarlo con E-06.
+- La central (E-06, #56) debe consumir `TRANSFER_SHIP_FAILED` (nuevo en `docs/events.md`)
+  y pasar de `SOURCE_RESERVED` a compensación. La bodega ya lo emite para
+  `SHIP_TRANSFER` sin reserva activa; falta acordar el nombre y la transición con Esteban.
 - Reintentos con límite y DLQ para comandos inválidos o con error: D-05.
