@@ -6,6 +6,7 @@ import cache
 import config
 import models
 import schemas
+from inventory_rules import adjustment_delta, InvalidAdjustmentError
 from common.events import new_event
 from common.outbox import add_event
 
@@ -35,10 +36,6 @@ class DuplicateSKUError(Exception):
 
 class ProductInUseError(Exception):
     """El producto tiene inventario o movimientos asociados."""
-
-
-class InvalidAdjustmentError(Exception):
-    """El conteo físico no se puede aplicar (bajo lo reservado o sin diferencia)."""
 
 
 def _sqlstate(error: IntegrityError):
@@ -227,15 +224,11 @@ def process_inventory_movement(
         elif movement.type == models.MovementType.ADJUSTMENT:
             # Conteo físico: movement.quantity es lo contado; se registra la
             # diferencia (puede ser negativa).
-            if movement.quantity < inventory.reserved_quantity:
-                raise InvalidAdjustmentError(
-                    "El conteo no puede ser menor que la cantidad reservada"
-                )
-            recorded_quantity = movement.quantity - inventory.quantity
-            if recorded_quantity == 0:
-                raise InvalidAdjustmentError(
-                    "El conteo coincide con el inventario: no hay diferencia que registrar"
-                )
+            recorded_quantity = adjustment_delta(
+                current_quantity=inventory.quantity,
+                counted_quantity=movement.quantity,
+                reserved_quantity=inventory.reserved_quantity,
+            )
             inventory.quantity = movement.quantity
 
         inventory.version += 1
