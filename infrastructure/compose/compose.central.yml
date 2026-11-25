@@ -1,0 +1,68 @@
+services:
+  rabbitmq_topology:
+    networks: [messaging]
+
+  central-db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: central
+      POSTGRES_USER: central
+      POSTGRES_PASSWORD: ${CENTRAL_DB_PASSWORD:-central_dev_password}
+    volumes:
+      - central_pgdata:/var/lib/postgresql/data
+      - ../sql/central/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U central -d central"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [central]
+
+  central-api:
+    build:
+      context: ../../services
+      dockerfile: central/Dockerfile
+    environment:
+      DATABASE_URL: "postgresql+psycopg2://central:${CENTRAL_DB_PASSWORD:-central_dev_password}@central-db:5432/central"
+      API_KEY: ${CENTRAL_API_KEY:-dev-central-key}
+      WAREHOUSE_API_KEY: ${API_KEY:-dev-api-key}
+      WAREHOUSE_URLS: "WH-001=http://wh001_api:8000,WH-002=http://wh002_api:8000,WH-003=http://wh003_api:8000"
+    ports: ["127.0.0.1:8004:8000"]
+    depends_on:
+      central-db:
+        condition: service_healthy
+    networks: [central, messaging]
+
+  central-worker:
+    build:
+      context: ../../services
+      dockerfile: central/Dockerfile
+    command: ["python", "-m", "app.workers.main"]
+    environment:
+      DATABASE_URL: "postgresql+psycopg2://central:${CENTRAL_DB_PASSWORD:-central_dev_password}@central-db:5432/central"
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+    depends_on:
+      central-db:
+        condition: service_healthy
+      rabbitmq_topology:
+        condition: service_completed_successfully
+    networks: [central, messaging]
+    restart: unless-stopped
+
+  locust-central:
+    image: locustio/locust:2.32.5
+    profiles: ["load"]
+    environment:
+      CENTRAL_API_KEY: ${CENTRAL_API_KEY:-dev-central-key}
+      LOAD_MODE: ${LOAD_MODE:-cqrs}
+      LOAD_SKU: ${LOAD_SKU:-P-001}
+    volumes:
+      - ../../tests/load:/mnt/locust:ro
+      - ../../docs/evidencias/fase-7:/results
+    networks: [central]
+
+networks:
+  central: {}
+
+volumes:
+  central_pgdata: {}

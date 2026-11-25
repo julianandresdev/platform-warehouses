@@ -4,7 +4,9 @@ import secrets
 import time
 from contextlib import asynccontextmanager
 from datetime import date
-from typing import Any
+from typing import Any, Literal
+
+import httpx
 from uuid import UUID
 
 from fastapi import (
@@ -19,6 +21,9 @@ from sqlalchemy.orm import Session
 from common.correlation import CorrelationIdMiddleware
 from common.logging import configure_logging
 
+from fastapi import Request
+from starlette.concurrency import run_in_threadpool
+from app.api.fanout import query_fanout
 from app import config
 from app.domain.database import get_db
 
@@ -39,7 +44,9 @@ logger = logging.getLogger(config.SERVICE_NAME)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     config.validate_settings()
-    yield
+    async with httpx.AsyncClient(timeout=0.5) as client:
+        app.state.fanout_client = client
+        yield
 
 
 app = FastAPI(
@@ -246,7 +253,23 @@ def get_global_warehouses(db: Session = Depends(get_db)):
 # --------------------------------------------------
 
 @protected.get("/global/inventory/{sku}")
-def get_global_inventory(
+async def get_global_inventory(
+    sku: str,
+    request: Request,
+    mode: Literal["cqrs", "fanout"] = "cqrs",
+    db: Session = Depends(get_db),
+):
+    if mode == "fanout":
+        return await query_fanout(
+            sku, request.app.state.fanout_client
+        )
+
+    return await run_in_threadpool(
+        get_cqrs_inventory, sku, db
+    )
+
+
+def get_cqrs_inventory(
     sku: str,
     db: Session = Depends(get_db)
 ):
