@@ -1,0 +1,74 @@
+name: Fase 1 - Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: admin
+          POSTGRES_DB: platform_test
+        ports:
+          - 5542:5432
+        options: >-
+          --health-cmd "pg_isready -U admin -d platform_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://admin:admin@127.0.0.1:5542/platform_test
+      E02_DATABASE_URL: postgresql+psycopg2://admin:admin@127.0.0.1:5542/platform_test
+      API_KEY: e02-test-key
+      WAREHOUSE_ID: WH-001
+      CACHE_ENABLED: "false"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Initialize PostgreSQL schema
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i "$POSTGRES_CONTAINER" \
+            psql -U admin -d platform_test -v ON_ERROR_STOP=1 \
+            < infrastructure/sql/warehouse/schema.sql
+
+          for file in infrastructure/sql/warehouse/migrations/*.sql; do
+            [ -f "$file" ] || continue
+
+            docker exec -i "$POSTGRES_CONTAINER" \
+              psql -U admin -d platform_test -v ON_ERROR_STOP=1 \
+              < "$file"
+          done
+
+      - name: Run unit tests
+        run: python -m pytest tests/unit -v
+
+      - name: Run integration and concurrency tests
+        run: python -m pytest tests/integration/fase1 -v

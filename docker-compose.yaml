@@ -72,6 +72,28 @@ services:
         condition: service_healthy
     restart: "no"
 
+
+  # Carga: docker compose --profile load run --rm locust
+  # Variables: LOAD_NAME (prefijo del CSV), LOAD_USERS, LOAD_TIME, LOAD_SCENARIO, LOAD_SKU.
+  locust:
+    image: locustio/locust:2.32.5
+    profiles: ["load"]
+    volumes:
+      - ./tests/load:/mnt/locust:ro
+      - ./docs/evidencias/fase-2:/results
+    environment:
+      API_KEY: ${API_KEY:-dev-api-key}
+      LOAD_SKU: ${LOAD_SKU:-P-001}
+      LOAD_WAIT: ${LOAD_WAIT:-0.05}
+      CACHE_ENABLED: ${CACHE_ENABLED:-true}
+    command: >
+      -f /mnt/locust/locustfile.py --headless
+      -u ${LOAD_USERS:-100} -r ${LOAD_USERS:-100} -t ${LOAD_TIME:-2m}
+      --host http://api:8000 --csv /results/${LOAD_TAG:-.}/${LOAD_NAME:-run}
+      ${LOAD_SCENARIO:-ReadSameSku}
+    depends_on:
+      - api
+
   outbox-worker:
     build: {context: ./services, dockerfile: warehouse-api/Dockerfile}
     command: ["python", "-m", "workers.outbox_relay"]
