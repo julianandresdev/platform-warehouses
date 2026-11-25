@@ -9,6 +9,7 @@ description = "Código compartido por los servicios: sobre de eventos, correlati
 requires-python = ">=3.12"
 # Cada módulo agrega aquí lo que necesite (aio-pika, boto3...).
 dependencies = [
+    "boto3>=1.34,<2",
     "pika>=1.3.2,<2",
     "pydantic>=2",
     "sqlalchemy>=2,<3",

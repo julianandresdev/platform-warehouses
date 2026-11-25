@@ -176,7 +176,47 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Almacenamiento S3 local (S-05). No arranca con `docker compose up`:
+  #   docker compose --profile storage up -d
+  # API S3 en 9000. El 9001 es el puerto de consola que pide el issue #26, pero esta
+  # versión de MinIO no sirve la interfaz web ahí (comprobado): ver ADR-0011.
+  minio:
+    image: bitnamilegacy/minio:2025.7.23
+    profiles: ["storage"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Crea el bucket y termina (restart: "no"). Es idempotente (--ignore-existing).
+  minio-init:
+    image: bitnamilegacy/minio-client:2025.7.21
+    profiles: ["storage"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
+        mc mb --ignore-existing local/$${S3_BUCKET}
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      S3_BUCKET: ${S3_BUCKET:-warehouse-platform}
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+
 volumes:
   central_pgdata: {}
   pgdata: {}
   rabbitmq_data: {}
+  minio_data: {}
