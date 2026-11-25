@@ -22,8 +22,8 @@ Líder: Julian · Apoyo: Esteban
 - [x] 409 para stock insuficiente, SKU duplicado y DELETE de un producto con movimientos.
 - [x] Tipo de movimiento `ADJUSTMENT` (conteo físico).
 - [x] Salidas validadas contra el disponible (`quantity - reserved_quantity`), columna `version`, inventario por SKU, API key y `/health/ready`.
-- [ ] Pruebas unitarias y de integración automatizadas (incluida la de 2 salidas concurrentes de 6 sobre stock 10): issue E-02 (#32).
-- [ ] Colección `.http` con las pruebas del README: issue E-02 (#32).
+- [x] Pruebas unitarias y de integración automatizadas (incluida la de 2 salidas concurrentes de 6 sobre stock 10): issue E-02 (#32).
+- [x] Colección `.http` con las pruebas del README: issue E-02 (#32).
 
 ## Decisiones
 
@@ -65,7 +65,83 @@ Verificación manual del cierre (PostgreSQL 18 local, API real, sin mocks):
 - Salida mayor al stock: 409 y el conteo de movimientos no cambia.
 - `CHECK` y `UNIQUE` rechazan escrituras directas en la base que violan las reglas.
 
-La evidencia automatizada (pytest en CI y colección `.http`) llega con E-02 (#32).
+### E-02 (#32) — Pruebas automatizadas
+
+Las pruebas se ejecutaron contra PostgreSQL 16 real,
+en una base aislada llamada `platform_test`.
+
+| Grupo de pruebas | Aprobadas |
+| --- | ---: |
+| Unitarias existentes | 28 |
+| Validacion de schemas | 17 |
+| Calculo de ADJUSTMENT | 7 |
+| Entorno PostgreSQL | 3 |
+| Integracion de productos | 4 |
+| Integracion de inventario | 5 |
+| Concurrencia | 2 |
+| **Total** | **66** |
+
+Comando de ejecucion:
+
+```bash
+python -m pytest tests/unit tests/integration/fase1 -q
+```
+
+Resultado: 66 pruebas aprobadas.
+
+Los fixtures utilizan `TRUNCATE ... RESTART IDENTITY CASCADE`
+antes y despues de cada prueba, con una proteccion que
+restringe la limpieza a la base de pruebas autorizada.
+
+#### Concurrencia
+
+Se ejecutaron 20 rondas de ambos escenarios:
+
+- Dos salidas simultaneas de 6 unidades sobre stock 10:
+  HTTP 201 y 409, stock final 4 y version 2.
+- Cuatro primeras entradas simultaneas de 5 unidades:
+  cuatro respuestas 201, una sola fila de inventario,
+  stock final 20 y version 4.
+
+#### Coleccion HTTP
+
+Archivo: [fase-1.http](../../tests/http/fase-1.http).
+
+Se implementaron los 12 escenarios del README y se
+verificaron sus 18 solicitudes equivalentes mediante HTTPX
+contra una instancia real de FastAPI.
+
+#### Evidencia PostgreSQL
+
+SKU utilizado: `E02-HTTP-1795494981`.
+
+Estado final:
+
+| SKU | Bodega | Cantidad | Reservado | Version |
+| --- | --- | ---: | ---: | ---: |
+| E02-HTTP-1795494981 | WH-001 | 5 | 0 | 3 |
+
+Historial persistido:
+
+| Tipo | Cantidad |
+| --- | ---: |
+| RECEIPT | 10 |
+| SHIPMENT | 4 |
+| ADJUSTMENT | -1 |
+
+La salida rechazada de 15 unidades retorno HTTP 409
+y no modifico el inventario ni genero un movimiento.
+
+Eventos persistidos en Outbox: 3.
+
+#### Integracion continua
+
+El workflow `.github/workflows/fase-1-tests.yml`
+automatiza las pruebas unitarias y de integracion
+utilizando un servicio PostgreSQL 16 independiente.
+
+La ejecucion remota se verifica en GitHub Actions.
+
 
 ## J-03 — `services/common`: sobre de eventos, correlation ID y logs JSON
 

@@ -152,4 +152,3 @@ los eventos pendientes y consolido las 184 unidades.
 
 Los CSV de Locust, respuestas JSON, pruebas automatizadas
 y metricas estan en docs/evidencias/fase-7/.
-
