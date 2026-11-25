@@ -300,7 +300,7 @@ MinIO permite probar el flujo de objetos desde Compose. S3 aporta la integració
 
 ### 28. ¿Cuándo utilizar un worker, un batch o Lambda?
 
-El worker se mantiene disponible para consumo continuo. Batch agrupa trabajo con horario o volumen definido. Lambda procesa eventos breves y puede tener arranque en frío. Las mediciones de AWS deben respaldar una comparación de duración y costo. [ADR de Lambda](adr/0017-lambda-validacion-eventos.md)
+El worker se mantiene disponible para consumo continuo. Batch agrupa trabajo con horario o volumen definido. Lambda procesa eventos breves y puede tener arranque en frío. Las mediciones de AWS deben respaldar una comparación de duración y costo. [ADR de Lambda](adr/0017-lambda-fuera-de-la-vpc.md)
 
 ### 29. ¿Cómo se controla el costo de la práctica?
 

@@ -26,7 +26,7 @@ documentar nuevas decisiones.
 | [0014](0014-batch-lee-bodegas-por-api.md) | El batch lee las bodegas por API | Julian | Disponible (J-08, PR #63) |
 | [0015](0015-reintentos-dlq-idempotencia.md) | Reintentos, DLQ e idempotencia | David | Borrador pendiente de revisión |
 | [0016](0016-prometheus-y-grafana.md) | Prometheus y Grafana | Santiago | Borrador pendiente de revisión |
-| [0017](0017-lambda-validacion-eventos.md) | Lambda fuera de la VPC | Santiago | Propuesta pendiente |
+| [0017](0017-lambda-fuera-de-la-vpc.md) | Lambda fuera de la VPC | Santiago | Disponible (S-08, PR #65) |
 | [0018](0018-despliegue-aws-learner-lab.md) | Despliegue AWS Learner Lab | Santiago | Borrador pendiente de revisión |
 | [0019](0019-mqtt-qos-y-deduplicacion.md) | MQTT, QoS e IoT | David | Borrador pendiente de revisión |
 
@@ -37,10 +37,9 @@ documentar nuevas decisiones.
 
 ## Inconsistencias pendientes
 
-- El ADR-0017 de Lambda contiene una propuesta
-  pendiente de aprobacion.
-- El ADR-0014 reemplaza la propuesta de exportacion CSV
-  con AWS Batch Fargate del PR #52, que no se integro.
+- Los ADR 0014 (Batch) y 0017 (Lambda) reemplazan las
+  propuestas del PR #52 (exportacion CSV con AWS Batch Fargate
+  y EventBridge), que no se integraron.
 
 ## Consolidacion
 
