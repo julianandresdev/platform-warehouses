@@ -1,4 +1,4 @@
-# ADR-0014 — Idempotencia de los comandos de la Saga en la bodega
+# ADR-0020 — Idempotencia de los comandos de la Saga en la bodega
 
 ## Estado
 

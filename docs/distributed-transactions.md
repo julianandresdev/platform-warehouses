@@ -60,7 +60,7 @@ Cantidades del ejemplo 100/20 → 70/50 (30 unidades de WH-001 a WH-002).
   a emitir la respuesta. Así nunca se reserva, despacha o recibe dos veces.
 
 Las decisiones y alternativas están en
-[ADR-0014](adr/0014-idempotencia-comandos-bodega.md).
+[ADR-0020](adr/0020-idempotencia-comandos-bodega.md).
 
 ### Casos límite
 

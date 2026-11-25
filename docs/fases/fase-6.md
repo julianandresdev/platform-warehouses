@@ -15,7 +15,7 @@
   outbox (respuesta e `INVENTORY_UPDATED`); ack después del commit.
 - `CHAOS_FAIL_STEP` para fallar antes o después del commit.
 - Documentación: sección Bodega de [distributed-transactions.md](../distributed-transactions.md)
-  y [ADR-0014](../adr/0014-idempotencia-comandos-bodega.md).
+  y [ADR-0020](../adr/0020-idempotencia-comandos-bodega.md).
 
 ### Evidencia
 
@@ -48,7 +48,7 @@ normales; así una venta local no puede llevarse unidades comprometidas.
 **¿Cómo se evita aplicar dos veces un paso que la central reenvía con otro `event_id`?**
 Los movimientos guardan `reference = transfer:<id>`. Con la fila de inventario
 bloqueada, el worker revisa si el paso ya existe para esa transferencia; si es así,
-solo vuelve a emitir la respuesta (ADR-0014).
+solo vuelve a emitir la respuesta (ADR-0020).
 
 ### Pendiente
 
