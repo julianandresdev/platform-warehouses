@@ -1,52 +1,59 @@
 # Architecture Decision Records (ADR)
 
-Los ADR registran las decisiones arquitectonicas del
-proyecto Warehouse Cloud Platform.
+Los ADR registran el contexto, las alternativas,
+las decisiones arquitectonicas y sus consecuencias.
 
-Cada documento debe explicar el contexto, las alternativas
-consideradas, la decision y sus consecuencias.
+Utilizar la [plantilla](0000-plantilla.md) para
+documentar nuevas decisiones.
 
-## Plantilla
+## Indice de decisiones
 
-Utilizar la [plantilla de ADR](0000-plantilla.md).
+| ADR | Tema | Responsable previsto | Estado |
+| --- | --- | --- | --- |
+| [0001](0001-fastapi-como-framework.md) | FastAPI y SQLAlchemy | Julian | Disponible |
+| [0002](0002-una-imagen-por-dominio.md) | Una imagen por dominio | Julian | Disponible |
+| [0003](0003-schema-sql-como-fuente-de-verdad.md) | Schema SQL y migraciones | Julian | Disponible |
+| [0004](0004-control-de-concurrencia-en-movimientos.md) | Control de concurrencia | Julian | Tema original por conciliar |
+| [0005](0005-topologia-rabbitmq.md) | Topologia RabbitMQ | David | Disponible |
+| [0006](0006-patron-outbox.md) | Transactional Outbox | David | Disponible |
+| 0007 | Una base por bodega | Santiago | Pendiente |
+| [0008](0008-cache-aside-con-redis.md) | Cache Aside con Redis | Julian | Disponible |
+| 0009 | Nginx y health checks pasivos | Santiago | Pendiente |
+| [0010](0010-autenticacion-api-key.md) | API Key | Esteban | Pendiente de revision |
+| 0011 | MinIO y S3 | Santiago | Pendiente |
+| [0012](0012-proyeccion-cqrs.md) | CQRS y Heartbeat | Esteban | Recuperado de E-04/E-06 |
+| [0013](0013-saga-orquestada.md) | Saga orquestada | Esteban | Recuperado de E-06 |
+| [0014](0014-batch-csv-s3.md) | Batch y S3 | Julian / Santiago | Propuesta pendiente |
+| 0015 | Reintentos, DLQ e idempotencia | David | Pendiente |
+| 0016 | Prometheus y Grafana | Santiago | Pendiente |
+| [0017](0017-lambda-validacion-eventos.md) | Lambda fuera de la VPC | Santiago | Propuesta pendiente |
+| 0018 | Despliegue AWS Learner Lab | Santiago | Pendiente |
+| 0019 | MQTT, QoS e IoT | David | Pendiente |
 
-Formato de nombre: NNNN-titulo-corto.md.
+## Decisiones adicionales
 
-## Indice de decisiones arquitectonicas
+- [Idempotencia de comandos Saga en bodega](0014-idempotencia-comandos-bodega.md):
+  documento de Julian correspondiente a J-07.
 
-Las fechas corresponden al cronograma original.
-El estado indica la disponibilidad del documento en esta rama.
+## Inconsistencias pendientes
 
-| ADR | Tema | Autor | Fecha prevista | Estado |
-| --- | --- | --- | --- | --- |
-| [0001](0001-fastapi-como-framework.md) | FastAPI + SQLAlchemy | Julian | 13 nov | Existente |
-| [0002](0002-una-imagen-por-dominio.md) | Una imagen por dominio con varios comandos | Julian | 13 nov | Existente |
-| [0003](0003-schema-sql-como-fuente-de-verdad.md) | schema.sql y migraciones en vez de create_all | Julian | 14 nov | Existente |
-| [0004](0004-control-de-concurrencia-en-movimientos.md) | WAREHOUSE_ID de texto y SKU como identificador global | Julian | 14 nov | Revisar correspondencia |
-| [0005](0005-topologia-rabbitmq.md) | Topologia de RabbitMQ | David | 15 nov | Existente |
-| [0006](0006-patron-outbox.md) | Patron Outbox | David | 16 nov | Existente |
-| 0007 | Una base por bodega | Santiago | 17 nov | Pendiente |
-| [0008](0008-cache-aside-con-redis.md) | Cache Aside, TTL e invalidacion sincrona contra asincrona | Julian | 17 nov | Existente |
-| 0009 | Nginx como balanceador y health checks pasivos | Santiago | 18 nov | Pendiente |
-| 0010 | API Key; usuarios y operadores fuera de alcance | Esteban | 18 nov | Pendiente |
-| 0011 | MinIO en local, S3 en AWS | Santiago | 19 nov | Pendiente |
-| 0012 | Read Model, CQRS y heartbeat | Esteban | 20 nov | Pendiente de integracion |
-| 0013 | Saga orquestada contra coreografia | Esteban | 21 nov | Pendiente de integracion |
-| 0014 | El Batch lee las bodegas por API | Julian | 21 nov | Pendiente |
-| 0015 | Reintentos, DLQ y clasificacion de errores | David | 21 nov | Pendiente |
-| 0016 | Prometheus + Grafana | Santiago | 22 nov | Pendiente |
-| 0017 | Lambda fuera de la VPC | Santiago | 23 nov | Pendiente |
-| 0018 | Despliegue en AWS Learner Lab | Santiago | 24 nov | Pendiente |
-| 0019 | MQTT, QoS y deduplicacion IoT | David | 24 nov | Pendiente |
+- El ADR-0004 documenta concurrencia, mientras que el
+  plan original asigna la identidad de bodegas y SKU.
+- Existen dos documentos con el identificador 0014.
+  Se conservan ambos hasta acordar su numeracion.
+- El ADR-0014 de Batch no confirma el cumplimiento
+  del contrato original de lectura mediante APIs.
+- Los ADR-0014 de Batch y 0017 de Lambda contienen
+  propuestas pendientes de aprobacion.
 
-## Observaciones
+## Consolidacion
 
-- El ADR-0004 existente documenta el control de concurrencia
-  en movimientos. Su tema difiere del cronograma original.
-  Se debe acordar su correspondencia con Julian.
-- Los ADR pendientes deben ser escritos por sus responsables.
-- Los ADR desarrollados en otras ramas se enlazaran
-  cuando sean integrados.
-- No se deben eliminar decisiones anteriores sin
-  documentar su reemplazo.
-- El indice se consolidara definitivamente durante E-08.
+Los documentos recuperados conservan su contenido original.
+Se debe verificar su version definitiva despues del merge
+de las ramas correspondientes.
+
+La existencia de un ADR no implica que la funcionalidad
+este integrada, probada o aprobada.
+
+La consolidacion definitiva requiere resolver las
+inconsistencias y completar los ADR pendientes.
