@@ -2,8 +2,18 @@ import logging
 import secrets
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Query,
+    Response,
+    status,
+)
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -223,6 +233,37 @@ def create_inventory_movement(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(error),
         )
+
+
+@protected.get(
+    "/inventory",
+    response_model=list[schemas.InventoryResponse],
+)
+def list_inventory(db: Session = Depends(get_db)):
+    """Foto del inventario de la bodega (lectura para el batch, J-08)."""
+
+    return services.list_inventory(db)
+
+
+@protected.get(
+    "/movements",
+    response_model=list[schemas.MovementResponse],
+)
+def list_movements(
+    from_: datetime = Query(alias="from"),
+    to: datetime = Query(),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    """Movimientos con ``from <= created_at < to``, paginados (lectura para el batch, J-08)."""
+
+    if from_ >= to:
+        raise HTTPException(
+            status_code=422,
+            detail="from debe ser anterior a to",
+        )
+    return services.list_movements(db, from_, to, page, page_size)
 
 
 @protected.get(
