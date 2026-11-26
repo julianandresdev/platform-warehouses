@@ -1,6 +1,6 @@
 -r services/warehouse-api/requirements.txt
 ./services/common
+psycopg[binary]
 pytest
 httpx
 fakeredis
-psycopg[binary]
