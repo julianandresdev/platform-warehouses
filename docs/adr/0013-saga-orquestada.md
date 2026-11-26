@@ -3,7 +3,7 @@
 ## Estado
 
 Aceptado para la implementacion de E-06.
-Integracion con J-07 pendiente.
+Integracion con J-07 validada localmente. PR #56 pendiente de fusion.
 
 ## Contexto
 
@@ -84,6 +84,14 @@ Un rechazo de recepcion genera un comando RETURN_STOCK
 y la transferencia pasa a CANCELLED cuando se confirma
 la compensacion.
 
+Un fallo definitivo de envio (TRANSFER_SHIP_FAILED)
+desde SOURCE_RESERVED genera RELEASE_RESERVATION.
+La transferencia pasa a COMPENSATING y termina en
+CANCELLED al recibir RESERVATION_RELEASED.
+
+No se utiliza RETURN_STOCK porque la mercancia no
+ha salido de la bodega.
+
 Si el destino permanece pendiente durante cinco minutos,
 se registra una alerta sin cancelar la transferencia.
 
@@ -114,8 +122,14 @@ La implementacion central fue validada mediante
 36 pruebas unitarias y pruebas funcionales simuladas
 con PostgreSQL y RabbitMQ.
 
-La integracion real con J-07 y la verificacion del
-invariante de conservacion de inventario quedan pendientes.
+Posteriormente se ampliaron las pruebas unitarias a 46/46
+y se validaron cinco escenarios de integracion con J-07.
+
+Se comprobo la conservacion de inventario, idempotencia
+HTTP, rechazo por stock insuficiente y compensaciones
+por fallos de recepcion y envio.
+
+Ver [evidencias E-06](../evidencias/fase-6/e06-integracion.md).
 
 La solucion no garantiza una transaccion ACID global
 ni entrega exactamente una vez de los mensajes.

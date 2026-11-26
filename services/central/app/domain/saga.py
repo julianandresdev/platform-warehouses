@@ -49,6 +49,14 @@ TRANSITIONS = {
             "destination"
         ),
 
+    # Envio rechazado: liberar la reserva del origen.
+    (S.SOURCE_RESERVED, "TRANSFER_SHIP_FAILED"):
+        Transition(
+            (S.COMPENSATING,),
+            "RELEASE_RESERVATION",
+            "source"
+        ),
+
     # Recepcion exitosa.
     (S.DESTINATION_PENDING, "TRANSFER_RECEIVED"):
         Transition(

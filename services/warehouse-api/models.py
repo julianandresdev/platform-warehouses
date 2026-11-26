@@ -27,6 +27,19 @@ class MovementType(str, enum.Enum):
     RECEIPT = "RECEIPT"
     SHIPMENT = "SHIPMENT"
     ADJUSTMENT = "ADJUSTMENT"
+    # Movimientos de la Saga de transferencias (migración 002). Solo los genera
+    # el worker de comandos; la API no los acepta en POST /inventory/movements.
+    RESERVATION = "RESERVATION"
+    RESERVATION_RELEASE = "RESERVATION_RELEASE"
+    TRANSFER_OUT = "TRANSFER_OUT"
+    TRANSFER_IN = "TRANSFER_IN"
+    TRANSFER_RETURN = "TRANSFER_RETURN"
+
+
+# Tipos que un cliente puede registrar a mano por la API.
+MANUAL_MOVEMENT_TYPES = frozenset(
+    {MovementType.RECEIPT, MovementType.SHIPMENT, MovementType.ADJUSTMENT}
+)
 
 
 class Product(Base):

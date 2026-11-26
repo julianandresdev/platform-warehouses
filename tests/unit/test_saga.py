@@ -144,3 +144,46 @@ def test_unknown_event():
         "RESERVING_SOURCE",
         "UNKNOWN_EVENT"
     ) is None
+
+
+# Fallo definitivo del envio.
+
+def test_transfer_ship_failed():
+    result = get_transition(
+        "SOURCE_RESERVED",
+        "TRANSFER_SHIP_FAILED"
+    )
+
+    assert result is not None
+    assert result.states == (
+        TransferStatus.COMPENSATING,
+    )
+    assert result.command == "RELEASE_RESERVATION"
+    assert result.target == "source"
+
+    compensation = get_transition(
+        result.states[-1],
+        "RESERVATION_RELEASED"
+    )
+
+    assert compensation is not None
+    assert compensation.states == (
+        TransferStatus.CANCELLED,
+    )
+    assert compensation.command is None
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        status.value
+        for status in TransferStatus
+        if status != TransferStatus.SOURCE_RESERVED
+    ]
+)
+def test_ship_failed_incompatible_states(status):
+
+    assert get_transition(
+        status,
+        "TRANSFER_SHIP_FAILED"
+    ) is None
