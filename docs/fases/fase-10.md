@@ -64,7 +64,7 @@ Los errores permanentes o los mensajes que agotan
 sus reintentos deben enviarse a una Dead Letter Queue
 para su inspección y tratamiento.
 
-Su validación experimental queda pendiente de D-06.
+D-05 implementa la cola `.retry` con TTL de cinco segundos, el límite de tres intentos, el envío directo de errores permanentes a `.dlq` y el CLI para inspección, reproducción y purga. Las pruebas automatizadas de RabbitMQ cubren JSON corrupto, error permanente y agotamiento de reintentos. D-06 conserva la validación manual de escenarios y evidencias oficiales.
 
 ## Hallazgos y limitaciones
 
@@ -79,13 +79,13 @@ Su validación experimental queda pendiente de D-06.
 
 Estas cuatro filas están identificadas en el plan de desarrollo.
 La matriz final de D-06 debe incorporar las cuatro filas adicionales
-del enunciado y comprobar la política de reintentos y DLQ de D-05.
+del enunciado y comprobar la política de reintentos y DLQ implementada en D-05.
 
 | Fallo | Respuesta y recuperación | Justificación y evidencia |
 | --- | --- | --- |
 | RabbitMQ no disponible al publicar | Confirmar el movimiento y el evento en PostgreSQL. El relay publica cuando vuelve el broker. | El outbox conserva el trabajo pendiente. [Pendiente](../evidencias/fase-10/rabbitmq-outbox-pendiente.txt) · [Publicado](../evidencias/fase-10/rabbitmq-outbox-publicado.txt) |
 | Destino de la Saga inaccesible | Mantener `DESTINATION_PENDING` después del envío. Completar cuando vuelva el consumidor o compensar si el destino devuelve un rechazo definitivo. | Cancelar ante un silencio puede duplicar unidades en tránsito. [Historial de la transferencia](../evidencias/fase-11/traza-transferencia-saga.json) |
-| Versión de evento desconocida | El plan la clasifica como error permanente y deriva el mensaje a DLQ con un diagnóstico. | Repetir el mismo mensaje no vuelve compatible su contrato. Pendiente de validación con D-05. |
+| Versión de evento desconocida | El plan la clasifica como error permanente y deriva el mensaje a DLQ con un diagnóstico. | Repetir el mismo mensaje no vuelve compatible su contrato. D-05 lo envía directamente a DLQ; cubierto por clasificación de errores permanentes. |
 | Redis no disponible | Leer PostgreSQL y responder con `X-Cache: BYPASS`. Recuperar el uso de caché cuando Redis vuelve. | PostgreSQL conserva la fuente de verdad. [Durante la caída](../evidencias/fase-10/redis-durante-1.txt) · [Tras recuperar Redis](../evidencias/fase-10/redis-despues-1.txt) |
 
 ## Estado
@@ -95,7 +95,7 @@ del enunciado y comprobar la política de reintentos y DLQ de D-05.
 - [x] Recuperación de WH-003 verificada.
 - [x] Diagnóstico de sincronización de P-001.
 - [ ] Validación de scripts oficiales D-06.
-- [ ] Matriz de errores y pruebas de retry/DLQ.
+- [x] Pruebas automatizadas de retry/DLQ de D-05; la matriz manual completa queda para D-06.
 - [ ] Validación de consumidor detenido y auditoría.
 - [ ] Revisión final.
 

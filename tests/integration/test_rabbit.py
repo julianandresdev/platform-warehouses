@@ -9,7 +9,14 @@ import unittest
 import uuid
 
 from common.correlation import get_correlation_id
-from common.rabbit import connect, consume, declare_topology, publish
+from common.rabbit import (
+    connect,
+    consume,
+    dead_letter_queue_name,
+    declare_topology,
+    publish,
+    retry_queue_name,
+)
 
 
 RABBITMQ_URL = os.getenv("RABBITMQ_URL")
@@ -83,7 +90,9 @@ class RabbitIntegrationTest(unittest.TestCase):
             stop.set()
             consumer_thread.join(timeout=5)
             cleanup = connect(RABBITMQ_URL)
-            cleanup.channel().queue_delete(queue=queue)
+            cleanup_channel = cleanup.channel()
+            for name in (queue, retry_queue_name(queue), dead_letter_queue_name(queue)):
+                cleanup_channel.queue_delete(queue=name, if_unused=False, if_empty=False)
             cleanup.close()
             self.assertFalse(consumer_thread.is_alive(), "el consumidor no terminó")
 

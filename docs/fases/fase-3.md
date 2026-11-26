@@ -4,7 +4,7 @@
 
 Se añadió RabbitMQ con consola de management y healthcheck a los Compose raíz y distribuido. El paquete `services/common` incluye el cliente `common.rabbit` para conexión con reintento, declaración durable e idempotente de exchanges, colas y bindings, publicación JSON persistente con publisher confirms y consumo con ack manual. El consumidor establece el `correlation_id` en el ContextVar compartido mientras ejecuta el handler y confirma el mensaje solo si el handler retorna correctamente.
 
-Los errores del handler se reencolan por ahora. El límite de reintentos y las DLQ pertenecen a D-05. El consumidor usa `set_correlation_id` y `reset_correlation_id` de J-03 para compartir el mismo contexto con el middleware HTTP.
+El manejo inicial reencolaba los errores del handler. D-05 sustituye esa política por reintentos acotados, DLQ y clasificación de errores. El consumidor usa `set_correlation_id` y `reset_correlation_id` de J-03 para compartir el mismo contexto con el middleware HTTP.
 
 ## Contrato
 

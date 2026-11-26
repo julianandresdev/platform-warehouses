@@ -11,14 +11,14 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field, ValidationError
 from sqlalchemy import text
 from sqlalchemy.orm import Session, sessionmaker
 
 import config
 from common.events import EventEnvelope
 from common.logging import configure_logging
-from common.rabbit import connect, consume, declare_topology
+from common.rabbit import PermanentError, connect, consume, declare_topology
 from database import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ class ReportRequested(BaseModel):
 
 def _report_result(session: Session, parameters: ReportParameters) -> dict[str, Any]:
     if parameters.end_at <= parameters.start_at:
-        raise ValueError("end_at debe ser posterior a start_at")
+        raise PermanentError("end_at debe ser posterior a start_at")
 
     bounds = {
         "start_at": parameters.as_utc_naive(parameters.start_at),
@@ -98,12 +98,15 @@ def process_report_event(
     message: dict,
     session_factory: sessionmaker[Session] = SessionLocal,
 ) -> None:
-    event = EventEnvelope.model_validate(message)
-    if event.event_type != "REPORT_REQUESTED":
-        raise ValueError("El worker solo acepta REPORT_REQUESTED")
-    request = ReportRequested.model_validate(event.payload)
+    try:
+        event = EventEnvelope.model_validate(message)
+        if event.event_type != "REPORT_REQUESTED":
+            raise PermanentError("El worker solo acepta REPORT_REQUESTED")
+        request = ReportRequested.model_validate(event.payload)
+    except ValidationError as exc:
+        raise PermanentError(f"Mensaje de reporte inválido: {exc}") from exc
     if request.warehouse_id != config.WAREHOUSE_ID:
-        raise ValueError("El reporte pertenece a otra bodega")
+        raise PermanentError("El reporte pertenece a otra bodega")
 
     try:
         with session_factory.begin() as session:
@@ -119,7 +122,7 @@ def process_report_event(
                 {"job_id": request.job_id},
             ).mappings().first()
             if job is None:
-                raise LookupError(f"No existe el reporte {request.job_id}")
+                raise PermanentError(f"No existe el reporte {request.job_id}")
             if job["status"] != "PROCESSING":
                 logger.info(
                     "report_job_duplicate_ignored",
@@ -127,7 +130,10 @@ def process_report_event(
                 )
                 return
 
-            parameters = ReportParameters.model_validate(job["params"])
+            try:
+                parameters = ReportParameters.model_validate(job["params"])
+            except ValidationError as exc:
+                raise PermanentError(f"Parámetros de reporte inválidos: {exc}") from exc
             result = _report_result(session, parameters)
             session.execute(
                 text(
@@ -140,7 +146,7 @@ def process_report_event(
                 ),
                 {"job_id": request.job_id, "result": json.dumps(result)},
             )
-    except LookupError:
+    except PermanentError:
         raise
     except Exception as error:
         with session_factory.begin() as session:
