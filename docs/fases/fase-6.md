@@ -117,11 +117,14 @@ Cada lectura registra cantidad, reserva y versión, en ese orden.
 | Timeout con confirmación tardía | Se detuvo el publicador del outbox de origen. La reserva se confirmó localmente antes del plazo y llegó a central después de `FAILED`. Se publicó `RELEASE_RESERVATION` y el stock disponible volvió a su valor inicial. |
 | Reinicio del orquestador | Se reinició el worker con la transferencia en `DESTINATION_PENDING`. El historial persistió y, al restaurar el consumidor de destino, la Saga terminó en `COMPLETED` con 175 unidades. |
 
-Para el fallo posterior a reserva se usó un rechazo definitivo del
-handler real. La opción `CHAOS_FAIL_STEP=SHIP_TRANSFER:before_commit`
-revierte el paso y reencola el comando. Ese mecanismo prueba el
-reintento y requiere una corrida aparte si se exige la inyección
-exacta del plan.
+Se probó también `CHAOS_FAIL_STEP=SHIP_TRANSFER:before_commit` en un
+consumidor temporal. El envío se revirtió y se reencoló. La Saga
+permaneció en `SOURCE_RESERVED`, con dos unidades reservadas y
+175 en inventario. Al restaurar el consumidor normal, el mismo
+envío se procesó y la Saga terminó en `COMPLETED`, con 175 unidades
+y cero reservas. Esta inyección reproduce un fallo recuperable.
+El rechazo definitivo del registro anterior prueba la ruta de
+compensación a `CANCELLED` por separado.
 
 ### Limitaciones y pendientes
 

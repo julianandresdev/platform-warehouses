@@ -585,6 +585,162 @@
         ]
       },
       "release_command_published": true
+    },
+    "fallo_inyectado_antes_del_commit_de_envio": {
+      "before": {
+        "WH-001": [
+          93,
+          0,
+          6
+        ],
+        "WH-002": [
+          27,
+          0,
+          2
+        ],
+        "WH-003": [
+          55,
+          0,
+          0
+        ]
+      },
+      "during": {
+        "WH-001": [
+          93,
+          2,
+          7
+        ],
+        "WH-002": [
+          27,
+          0,
+          2
+        ],
+        "WH-003": [
+          55,
+          0,
+          0
+        ]
+      },
+      "after": {
+        "WH-001": [
+          91,
+          0,
+          8
+        ],
+        "WH-002": [
+          29,
+          0,
+          3
+        ],
+        "WH-003": [
+          55,
+          0,
+          0
+        ]
+      },
+      "while_fault_active": {
+        "source_warehouse_id": "WH-001",
+        "destination_warehouse_id": "WH-002",
+        "sku": "E06-VERIFY-b3d13672",
+        "quantity": 2,
+        "status": "SOURCE_RESERVED",
+        "reason": null,
+        "deadline": "2026-11-26T02:39:40.691900+00:00",
+        "created_at": "2026-11-26T02:39:10.691900+00:00",
+        "updated_at": "2026-11-26T02:39:14.497804+00:00",
+        "completed_at": null,
+        "transfer_id": "c28538ba-2f99-42b3-96dd-cfbd83fb8788",
+        "history": [
+          {
+            "previous_status": null,
+            "new_status": "REQUESTED",
+            "reason": null,
+            "correlation_id": "COR-20261126-6e8516ec",
+            "created_at": "2026-11-26T02:39:10.691900+00:00"
+          },
+          {
+            "previous_status": "REQUESTED",
+            "new_status": "RESERVING_SOURCE",
+            "reason": null,
+            "correlation_id": "COR-20261126-6e8516ec",
+            "created_at": "2026-11-26T02:39:10.691900+00:00"
+          },
+          {
+            "previous_status": "RESERVING_SOURCE",
+            "new_status": "SOURCE_RESERVED",
+            "reason": null,
+            "correlation_id": "COR-20261126-6e8516ec",
+            "created_at": "2026-11-26T02:39:14.497804+00:00"
+          }
+        ]
+      },
+      "transfer": {
+        "source_warehouse_id": "WH-001",
+        "destination_warehouse_id": "WH-002",
+        "sku": "E06-VERIFY-b3d13672",
+        "quantity": 2,
+        "status": "COMPLETED",
+        "reason": null,
+        "deadline": "2026-11-26T02:39:40.691900+00:00",
+        "created_at": "2026-11-26T02:39:10.691900+00:00",
+        "updated_at": "2026-11-26T02:39:32.295692+00:00",
+        "completed_at": "2026-11-26T02:39:32.295692+00:00",
+        "transfer_id": "c28538ba-2f99-42b3-96dd-cfbd83fb8788",
+        "history": [
+          {
+            "previous_status": null,
+            "new_status": "REQUESTED",
+            "reason": null,
+            "correlation_id": "COR-20261126-6e8516ec",
+            "created_at": "2026-11-26T02:39:10.691900+00:00"
+          },
+          {
+            "previous_status": "REQUESTED",
+            "new_status": "RESERVING_SOURCE",
+            "reason": null,
+            "correlation_id": "COR-20261126-6e8516ec",
+            "created_at": "2026-11-26T02:39:10.691900+00:00"
+          },
+          {
+            "previous_status": "RESERVING_SOURCE",
+            "new_status": "SOURCE_RESERVED",
+            "reason": null,
+            "correlation_id": "COR-20261126-6e8516ec",
+            "created_at": "2026-11-26T02:39:14.497804+00:00"
+          },
+          {
+            "previous_status": "SOURCE_RESERVED",
+            "new_status": "IN_TRANSIT",
+            "reason": null,
+            "correlation_id": "COR-20261126-6e8516ec",
+            "created_at": "2026-11-26T02:39:26.841943+00:00"
+          },
+          {
+            "previous_status": "IN_TRANSIT",
+            "new_status": "DESTINATION_PENDING",
+            "reason": null,
+            "correlation_id": "COR-20261126-6e8516ec",
+            "created_at": "2026-11-26T02:39:26.841943+00:00"
+          },
+          {
+            "previous_status": "DESTINATION_PENDING",
+            "new_status": "DESTINATION_RECEIVED",
+            "reason": null,
+            "correlation_id": "COR-20261126-6e8516ec",
+            "created_at": "2026-11-26T02:39:32.295692+00:00"
+          },
+          {
+            "previous_status": "DESTINATION_RECEIVED",
+            "new_status": "COMPLETED",
+            "reason": null,
+            "correlation_id": "COR-20261126-6e8516ec",
+            "created_at": "2026-11-26T02:39:32.295692+00:00"
+          }
+        ]
+      },
+      "worker_excerpt": [
+        "{\"timestamp\": \"2026-11-26T02:39:15.076Z\", \"service\": \"warehouse-commands\", \"warehouse_id\": \"WH-001\", \"level\": \"WARNING\", \"event\": \"chaos_fail_injected\", \"correlation_id\": \"COR-20261126-6e8516ec\", \"command\": \"SHIP_TRANSFER\", \"step\": \"before_commit\"}"
+      ]
     }
   }
 }
