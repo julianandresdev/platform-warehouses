@@ -27,6 +27,7 @@ from common.metrics import observe_request
 import schemas
 import services
 from common.correlation import CorrelationIdMiddleware
+from common.instance import InstanceHeaderMiddleware
 from common.logging import configure_logging
 from common.events import new_event
 from common.outbox import add_event
@@ -71,6 +72,8 @@ register_pool_error_handler(app)
 # Se agrega al final para que sea la capa más externa: el correlation ID ya está
 # fijado cuando corre el log de arriba.
 app.add_middleware(CorrelationIdMiddleware)
+# X-Instance: qué réplica respondió (S-04, balanceo con nginx).
+app.add_middleware(InstanceHeaderMiddleware)
 
 
 def require_api_key(x_api_key: str | None = Header(default=None)):

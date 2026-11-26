@@ -17,12 +17,21 @@ repetir la lógica de descubrimiento y manejo de errores en cada cliente.
 Un balanceador centraliza esa política. Los chequeos activos pueden
 detectar fallos antes de una solicitud, con sondeos adicionales.
 
+HAProxy ofrece chequeos activos y estadísticas por servidor en su versión
+libre; un ALB de AWS los ofrece gestionados y con varias zonas, pero no
+corre en local. Nginx basta para tres réplicas y para la demo en Compose.
+
 ## Decisión
 
 Usar Nginx con un grupo de servidores para WH-002 y resolución dinámica
 por DNS interno de Docker. La detección pasiva usa `max_fails=1` y
 `fail_timeout=10s`. La configuración limita a tres los intentos ante
 errores, timeouts y respuestas 502, 503 o 504, según las reglas de Nginx.
+
+S-04 añade el perfil `lb` de Compose con tres réplicas numeradas y
+`nginx.lb.conf` en el puerto 8002: `max_fails=2`, `fail_timeout=10s`,
+`proxy_connect_timeout 1s`, dos intentos, `X-Upstream` y log JSON. La
+configuración por defecto del puerto 8080 se mantiene para la demo y la F11.
 
 ## Consecuencias
 
