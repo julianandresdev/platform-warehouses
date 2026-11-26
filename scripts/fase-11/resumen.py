@@ -3,7 +3,6 @@
 
 import csv
 import re
-import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2] / "docs" / "evidencias" / "fase-11"

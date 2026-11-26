@@ -21,7 +21,6 @@ from sqlalchemy.orm import Session
 from common.correlation import CorrelationIdMiddleware
 from common.logging import configure_logging
 from common.metrics import observe_request
-from fastapi.responses import Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from fastapi import Request
@@ -480,7 +479,7 @@ def list_global_inventory(
     }
 
 
-from app.api.transfers import router as transfers_router
+from app.api.transfers import router as transfers_router  # noqa: E402
 
 protected.include_router(transfers_router)
 

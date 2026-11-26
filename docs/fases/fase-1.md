@@ -142,6 +142,32 @@ utilizando un servicio PostgreSQL 16 independiente.
 
 La ejecucion remota se verifica en GitHub Actions.
 
+## S-02 — CI en GitHub Actions (ruff + pytest + integración)
+
+El workflow `.github/workflows/ci.yml` corre en cada `pull_request` y en cada
+`push` a `main`, con dos jobs independientes (Python 3.12, caché de pip con
+`actions/setup-python`):
+
+| Job | Qué hace |
+| --- | --- |
+| `lint` | `ruff check .` con la versión fijada en `requirements-dev.txt` (`ruff==0.17.6`) y la configuración de `ruff.toml` (reglas `E` y `F`, sin `E501`). |
+| `test` | Levanta `postgres:16` (puerto 5542), un segundo `postgres:16` para central (5543), `redis:7` y `rabbitmq:3-management`; aplica `schema.sql` y las migraciones del warehouse y el esquema de central; ejecuta `pytest tests/unit` y `pytest tests/integration`. |
+
+Notas:
+
+- `tests/unit` y `tests/integration` se lanzan en pasos separados, porque los
+  tests de central y de warehouse-api importan paquetes distintos llamados `app`
+  y chocan si comparten proceso. La prueba de auditoría de central
+  (`fase3/central_audit`) corre en un tercer paso contra su propia base.
+- Los tests que necesitan MinIO (`test_storage.py`, `test_report_validator_minio.py`)
+  o la API levantada con compose (`test_inventory_cache.py`) se omiten solos
+  (`skip`) cuando el servicio no está disponible; el CI no levanta MinIO.
+- Para reproducirlo en local: `pip install -r requirements-dev.txt`,
+  `ruff check .` y las mismas variables de entorno que el job `test`.
+- Los workflows por fase (`fase-*.yml`) se mantienen; `ci.yml` es el check
+  general que debe marcarse como obligatorio en la protección de `main`
+  (jobs `lint` y `test`).
+
 
 ## J-03 — `services/common`: sobre de eventos, correlation ID y logs JSON
 

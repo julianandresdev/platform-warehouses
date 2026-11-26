@@ -1,0 +1,9 @@
+# Configuración mínima de lint para CI (S-02).
+target-version = "py312"
+line-length = 100
+extend-exclude = [".claude"]
+
+[lint]
+# E: pycodestyle (errores), F: pyflakes. E501 se ignora: el formato no se verifica en CI.
+select = ["E", "F"]
+ignore = ["E501"]

@@ -8,7 +8,7 @@ import cache
 import config
 import models
 import schemas
-from inventory_rules import adjustment_delta, InvalidAdjustmentError
+from inventory_rules import adjustment_delta, InvalidAdjustmentError  # noqa: F401 (reexportado)
 from common.events import new_event
 from common.outbox import add_event
 

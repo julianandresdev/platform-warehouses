@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import signal
 import threading
-import time
 from datetime import datetime, timezone
 
 from prometheus_client import Counter, Gauge, Histogram, start_http_server
