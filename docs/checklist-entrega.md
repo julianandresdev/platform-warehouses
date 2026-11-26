@@ -47,7 +47,7 @@ Estado: Pendiente de integracion y validacion final.
 - [ ] Documentar las fases 1 a 12 con evidencias.
 - [x] Preparar 33 respuestas de ensayo para revisión.
 - [ ] Validar las respuestas de cada bloque con sus responsables.
-- [ ] Contrastar las preguntas con el enunciado original.
+- [x] Cotejar las 33 preguntas con la sección 33 del enunciado y alinear la guía de ensayo.
 - [x] README principal actualizado con ejecución, perfil de carga y enlaces de demo.
 
 ## Integracion pendiente
