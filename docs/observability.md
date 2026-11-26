@@ -2,7 +2,7 @@
 
 Estado: Pendiente de completar.
 
-## Indice
+## Índice
 
 - Logs estructurados
 - Correlation ID

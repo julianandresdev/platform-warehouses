@@ -2,7 +2,7 @@
 
 Estado: Pendiente de completar.
 
-## Indice
+## Índice
 
 - Arquitectura cloud
 - Infraestructura con Terraform

@@ -1,22 +1,18 @@
 # Fase 11 - Observabilidad y pruebas de carga
 
-Lider: Julian | Apoyo: Esteban y Santiago
+Líder: Julian · Apoyo: Esteban y Santiago
 
 Estado: Pendiente de documentar.
 
-## Que se construyo
+## Qué se construyó
 
 ## Cierre de la fase
 
 ## Decisiones
 
-| Decision | Elegido | Por que |
+| Decisión | Elegido | Por qué |
 | --- | --- | --- |
-
-## Pruebas realizadas
-
-## Resultados y evidencias
 
 ## Preguntas del profesor
 
-## Pendientes
+## Evidencia

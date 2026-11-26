@@ -2,7 +2,7 @@
 
 Estado: Pendiente de completar.
 
-## Indice
+## Índice
 
 - Preparacion del entorno
 - Escenarios de demostracion

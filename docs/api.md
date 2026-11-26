@@ -1,12 +1,12 @@
-# Documentacion de las APIs
+# Documentación de las APIs
 
 Estado: Pendiente de completar.
 
-## Indice
+## Índice
 
 - Warehouse API
 - Central API
-- Autenticacion
+- Autenticación
 - Contratos OpenAPI
 - Codigos de respuesta
 
@@ -16,7 +16,7 @@ Estado: Pendiente de completar.
 ## Central API
 
 
-## Autenticacion
+## Autenticación
 
 
 ## Contratos OpenAPI

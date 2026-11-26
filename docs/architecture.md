@@ -2,13 +2,13 @@
 
 Estado: Pendiente de completar.
 
-## Indice
+## Índice
 
 - Contexto
 - Diagrama de arquitectura
 - Componentes
-- Comunicacion entre servicios
-- Decisiones arquitectonicas
+- Comunicación entre servicios
+- Decisiones arquitectónicas
 
 ## Contexto
 
@@ -19,7 +19,7 @@ Estado: Pendiente de completar.
 ## Componentes
 
 
-## Comunicacion entre servicios
+## Comunicación entre servicios
 
 
-## Decisiones arquitectonicas
+## Decisiones arquitectónicas
