@@ -16,11 +16,11 @@ documentar nuevas decisiones.
 | [0004](0004-control-de-concurrencia-en-movimientos.md) | Control de concurrencia | Julian | Disponible |
 | [0005](0005-topologia-rabbitmq.md) | Topologia RabbitMQ | David | Disponible |
 | [0006](0006-patron-outbox.md) | Transactional Outbox | David | Disponible |
-| 0007 | Una base por bodega | Santiago | Pendiente |
+| [0007](0007-una-base-por-bodega.md) | Una base por bodega | Santiago | Borrador pendiente de revisión |
 | [0008](0008-cache-aside-con-redis.md) | Cache Aside con Redis | Julian | Disponible |
-| 0009 | Nginx y health checks pasivos | Santiago | Pendiente |
+| [0009](0009-nginx-y-health-checks-pasivos.md) | Nginx y health checks pasivos | Santiago | Borrador pendiente de revisión |
 | [0010](0010-autenticacion-api-key.md) | API Key | Esteban | Pendiente de revision |
-| 0011 | MinIO y S3 | Santiago | Pendiente |
+| [0011](0011-minio-local-y-s3-en-aws.md) | MinIO y S3 | Santiago | Borrador pendiente de revisión |
 | [0012](0012-proyeccion-cqrs.md) | CQRS y Heartbeat | Esteban | Recuperado de E-04/E-06 |
 | [0013](0013-saga-orquestada.md) | Saga orquestada | Esteban | Recuperado de E-06 |
 | [0014](0014-batch-csv-s3.md) | Batch y S3 | Julian / Santiago | Propuesta pendiente |
