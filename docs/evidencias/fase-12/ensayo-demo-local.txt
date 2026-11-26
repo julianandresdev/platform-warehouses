@@ -1,0 +1,149 @@
+Ensayo completo de la demo, local (Compose distribuido + central + observabilidad), 26 nov 2026
+Cada paso es 'scripts/demo.sh <paso>'; se anota lo que tardó.
+
+################ salud
+
+== Salud de las tres bodegas, la central y una transferencia de punta a punta ==
+PASS  WH-001 /health
+PASS  WH-001 /health/ready (base de datos)
+PASS  WH-001 GET /inventory/P-001
+PASS  WH-002 /health
+PASS  WH-002 /health/ready (base de datos)
+PASS  WH-002 GET /inventory/P-001
+PASS  WH-003 /health
+PASS  WH-003 /health/ready (base de datos)
+PASS  WH-003 GET /inventory/P-001
+PASS  central /health/ready
+PASS  transferencia b0e60c31-438f-4154-bd4b-741c5dd73f0d COMPLETED (COR-SMOKE-1795671440)
+PASS  central GET /global/inventory (vista global)
+
+Todo en orden.
+(duración del paso: 3 s)
+
+################ movimiento
+
+== Movimiento de inventario en WH-001 (entra una unidad de P-001) ==
+antes  : P-001 = 59 (reservado 0 , versión 48 )
+movimiento 64 RECEIPT 1 en WH-001
+después: P-001 = 60 (reservado 0 , versión 49 )
+(duración del paso: 0 s)
+
+################ cache
+
+== Caché de WH-001: tras escribir, la primera lectura es MISS y la segunda HIT ==
+(movimiento registrado: invalida la caché)
+lectura 1: x-cache: MISS
+lectura 2: x-cache: HIT
+(duración del paso: 0 s)
+
+################ rabbit
+
+== Eventos en RabbitMQ (API de administración, guest/guest) ==
+RabbitMQ 3.13.7 | publicados: 97 | entregados con ack: 74
+central.audit: 84 en cola, 0 consumidor(es)
+central.projection: 0 en cola, 1 consumidor(es)
+central.transfer-orchestrator: 0 en cola, 1 consumidor(es)
+wh-001.cache-invalidation: 13 en cola, 0 consumidor(es)
+wh-001.commands: 0 en cola, 1 consumidor(es)
+wh-001.reports: 0 en cola, 1 consumidor(es)
+Consola web: http://localhost:15672 (guest / guest)
+(duración del paso: 0 s)
+
+################ global
+
+== Vista global de P-001 (proyección de la central) ==
+total: 180
+  WH-001 61 versión 50 al día
+  WH-002 50 versión 9 al día
+  WH-003 69 versión 15 al día
+(duración del paso: 4 s)
+
+################ transferencia
+
+== Transferencia de 10 unidades de P-001 de WH-001 a WH-002 (Saga) ==
+WH-001 antes  : P-001 = 61 (reservado 0 , versión 50 )
+WH-002 antes  : P-001 = 50 (reservado 0 , versión 9 )
+transferencia 5e485407-21dd-42ce-95d2-ee6f720efb08 (X-Correlation-ID: COR-DEMO-t-003726)
+estado : COMPLETED 
+historia: REQUESTED -> RESERVING_SOURCE -> SOURCE_RESERVED -> IN_TRANSIT -> DESTINATION_PENDING -> DESTINATION_RECEIVED -> COMPLETED
+WH-001 después: P-001 = 51 (reservado 0 , versión 52 )
+WH-002 después: P-001 = 60 (reservado 0 , versión 10 )
+(duración del paso: 3 s)
+
+################ compensacion
+
+== Fallo provocado: un SKU que solo existe en el origen (compensación) ==
+WH-001 antes  : SOLO-003729 = 40 (reservado 0 , versión 1 )
+estado : CANCELLED SKU_NOT_FOUND
+historia: REQUESTED -> RESERVING_SOURCE -> SOURCE_RESERVED -> IN_TRANSIT -> DESTINATION_PENDING -> COMPENSATING -> CANCELLED
+WH-001 después: SOLO-003729 = 40 (reservado 0 , versión 4 )
+(duración del paso: 3 s)
+
+################ caos
+
+== Fallo provocado: el worker de WH-001 cae después del commit y el mensaje se reentrega (solo local) ==
+WH-001 antes  : P-002 = 75 (reservado 0 , versión 3 )
+estado : COMPLETED 
+historia: REQUESTED -> RESERVING_SOURCE -> SOURCE_RESERVED -> IN_TRANSIT -> DESTINATION_PENDING -> DESTINATION_RECEIVED -> COMPLETED
+   1 "event": "chaos_fail_injected"
+   1 "event": "command_duplicate"
+WH-001 después: P-002 = 70 (reservado 0 , versión 5 )
+(se descontaron 5 unidades una sola vez)
+(duración del paso: 28 s)
+
+################ bodega-caida
+
+== WH-002 caída: las demás siguen respondiendo y la vista global lo marca (solo local) ==
+WH-001 responde: HTTP 200
+WH-003 responde: HTTP 200
+WH-002 (nginx) responde: HTTP 502
+esperando 95 s (la central marca una bodega como desactualizada tras 90 s sin latido)...
+{
+ "count": 3,
+ "warehouses": [
+  {
+   "warehouse_id": "WH-001",
+   "last_seen_at": "2026-11-26T05:39:16+00:00",
+   "last_event_at": "2026-11-26T05:37:44+00:00",
+   "stale": false
+  },
+  {
+   "warehouse_id": "WH-002",
+   "last_seen_at": "2026-11-26T05:37:49+00:00",
+   "last_event_at": "2026-11-26T05:37:28+00:00",
+   "stale": true
+  },
+  {
+   "warehouse_id": "WH-003",
+   "last_seen_at": "2026-11-26T05:39:15+00:00",
+   "last_event_at": "2026-11-26T05:37:45+00:00",
+   "stale": false
+  }
+ ]
+}
+(duración del paso: 101 s)
+
+################ carga
+
+== Carga sobre WH-001 con Grafana en vivo (http://localhost:3000, admin / admin) (solo local) ==
+         Aggregated                                                                              2      3      4      5     11     23     56    110    300    340    340  41307
+(duración del paso: 46 s)
+
+################ batch
+
+== Reporte diario: batch -> S3 -> Lambda -> central ==
+En AWS (con la EC2 desplegada, ver docs/aws.md), el batch corre contra las APIs públicas y el bucket real;
+la Lambda se dispara sola al crearse reports/daily/<fecha>/summary.json:
+  PYTHONPATH=services/batch:services/common WH001_API_URL=http://$HOST:8101 WH002_API_URL=http://$HOST:8102 \
+  WH003_API_URL=http://$HOST:8103 API_KEY=... CENTRAL_API_URL=http://$HOST:8004 CENTRAL_API_KEY=... \
+  S3_BUCKET=<bucket> python -m batch.daily_report --date $(date -u +%F)
+
+Local, con MinIO (la Lambda no corre en local: se prueba con un evento S3 de ejemplo):
+batch: SUCCEEDED | bodegas faltantes: [] | correlation_id: COR-20261126-61932301
+[2026-11-26 05:40:41 UTC]   995B STANDARD reports/daily/2026-11-26/summary.json
+[2026-11-26 05:40:41 UTC] 2.4KiB STANDARD warehouses/WH-001/2026/11/inventory-2026-11-26.json
+[2026-11-26 05:40:41 UTC] 2.0KiB STANDARD warehouses/WH-002/2026/11/inventory-2026-11-26.json
+[2026-11-26 05:40:41 UTC] 2.0KiB STANDARD warehouses/WH-003/2026/11/inventory-2026-11-26.json
+
+Lambda con un evento S3 de ejemplo: S3_ENDPOINT_URL=http://localhost:9000 pytest tests/integration/test_report_validator_minio.py
+(duración del paso: 15 s)

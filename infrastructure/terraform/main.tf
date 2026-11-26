@@ -7,6 +7,13 @@ locals {
   bucket_arn = "arn:aws:s3:::${var.bucket_name}"
 }
 
+# IP fija creada antes que la EC2: la Lambda necesita la URL de la central y la EC2 necesita
+# el bucket, que a su vez depende de la Lambda. La IP rompe ese ciclo.
+resource "aws_eip" "platform" {
+  domain = "vpc"
+  tags   = { Name = "${var.project_prefix}-platform", Project = var.project_prefix, ManagedBy = "terraform" }
+}
+
 module "network" {
   source = "./modules/network"
 
@@ -33,16 +40,21 @@ module "database" {
 module "lambda" {
   source = "./modules/lambda"
 
-  function_name         = "${var.project_prefix}-export-handler"
-  source_dir            = "${path.root}/../../services/lambda/report_validator"
-  bucket_arn            = local.bucket_arn
-  role_name             = var.lab_role_name
-  environment_variables = { EVENT_BUS_NAME = "default" }
+  function_name = "${var.project_prefix}-export-handler"
+  source_dir    = "${path.root}/../../services/lambda/report_validator"
+  bucket_arn    = local.bucket_arn
+  role_name     = var.lab_role_name
+  environment_variables = {
+    EVENT_BUS_NAME  = "default"
+    CENTRAL_API_URL = "http://${aws_eip.platform.public_ip}:${var.central_api_port}"
+    CENTRAL_API_KEY = var.central_api_key
+  }
 }
 
 module "storage" {
   source = "./modules/storage"
 
+  region              = var.aws_region
   project_prefix      = var.project_prefix
   bucket_name         = var.bucket_name
   force_destroy       = var.force_destroy_bucket
@@ -62,9 +74,15 @@ module "compute" {
   security_group_id     = module.network.app_security_group_id
   instance_profile_name = var.instance_profile_name
   ecr_registry          = local.ecr_registry
+  bundle_s3_uri         = "s3://${module.storage.bucket_name}/deploy"
+  associate_eip         = true
+  eip_allocation_id     = aws_eip.platform.id
 
   env_vars = merge(
     {
+      API_KEY            = var.api_key
+      CENTRAL_API_KEY    = var.central_api_key
+      DB_PASSWORD        = var.db_password
       DATABASE_URL       = "postgresql+psycopg2://${module.database.username}:${var.db_password}@${module.database.endpoint}/${module.database.db_name}"
       S3_BUCKET          = module.storage.bucket_name
       AWS_DEFAULT_REGION = var.aws_region
@@ -76,11 +94,6 @@ module "compute" {
 
 # El estado ya existente (bucket, Lambda y permiso) se conserva al pasar a modulos.
 # El rol IAM propio que creaba la version anterior se reemplaza por LabRole.
-moved {
-  from = aws_s3_bucket.reports
-  to   = module.storage.aws_s3_bucket.reports
-}
-
 moved {
   from = aws_s3_bucket_public_access_block.reports
   to   = module.storage.aws_s3_bucket_public_access_block.reports

@@ -1,0 +1,17 @@
+# Consultas propias de postgres_exporter para una base de bodega.
+warehouse_outbox:
+  query: |
+    SELECT count(*) FILTER (WHERE published_at IS NULL) AS pending,
+           COALESCE(EXTRACT(EPOCH FROM now() - min(created_at) FILTER (WHERE published_at IS NULL)), 0) AS oldest_seconds,
+           COALESCE(max(attempts) FILTER (WHERE published_at IS NULL), 0) AS max_attempts
+    FROM outbox
+  metrics:
+    - pending:
+        usage: GAUGE
+        description: Eventos de outbox sin publicar
+    - oldest_seconds:
+        usage: GAUGE
+        description: Antigüedad en segundos del evento pendiente más viejo
+    - max_attempts:
+        usage: GAUGE
+        description: Máximo de intentos de publicación entre los pendientes

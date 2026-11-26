@@ -1,0 +1,6 @@
+Method,Name,Error,Occurrences
+GET,GET /products,RemoteDisconnected('Remote end closed connection without response'),79
+GET,GET /inventory/{sku},RemoteDisconnected('Remote end closed connection without response'),53
+GET,GET /inventory/{sku},"ConnectionResetError(104, 'Connection reset by peer')",2
+GET,GET /products,HTTPError('502 Server Error: Bad Gateway for url: GET /products'),182807
+GET,GET /inventory/{sku},HTTPError('502 Server Error: Bad Gateway for url: GET /inventory/{sku}'),182521

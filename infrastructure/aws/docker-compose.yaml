@@ -1,0 +1,255 @@
+# Plataforma completa en la EC2 (S-09). scripts/aws-bundle.sh la sube a s3://<bucket>/deploy/
+# junto con sql/, y el user_data de la instancia la descarga a /opt/warehouse-platform.
+# Las imágenes salen de ECR (scripts/push-ecr.sh). El .env lo escribe Terraform:
+#   ECR_REGISTRY, DATABASE_URL (WH-001 en RDS), DB_PASSWORD, API_KEY, CENTRAL_API_KEY,
+#   S3_BUCKET y AWS_DEFAULT_REGION.
+# WH-001 usa RDS; WH-002, WH-003 y la central usan PostgreSQL en contenedor.
+# Sin credenciales de AWS en el disco: S3 se accede con el perfil de la instancia.
+x-wh: &wh
+  image: ${ECR_REGISTRY}/warehouse:${IMAGE_TAG:-latest}
+  restart: unless-stopped
+
+x-wh-env: &wh-env
+  API_KEY: ${API_KEY}
+  RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+x-db: &db
+  image: postgres:16-alpine
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U admin -d platform"]
+    interval: 5s
+    timeout: 5s
+    retries: 10
+
+x-redis: &redis
+  image: redis:7-alpine
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "redis-cli", "ping"]
+    interval: 5s
+    timeout: 3s
+    retries: 10
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    restart: unless-stopped
+    ports: ["15672:15672"]
+    volumes: [rabbitmq_data:/var/lib/rabbitmq]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq_topology:
+    <<: *wh
+    command: ["python", "-m", "common.topology"]
+    restart: "no"
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+    depends_on:
+      rabbitmq: {condition: service_healthy}
+
+  # ---- WH-001: PostgreSQL en RDS ----
+  # Aplica schema, migraciones y seed en RDS la primera vez (si la tabla products no existe).
+  wh001_db_init:
+    image: postgres:16-alpine
+    restart: "no"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    volumes:
+      - ./sql/warehouse:/sql:ro
+      - ./init-rds.sh:/init-rds.sh:ro
+    entrypoint: ["sh", "/init-rds.sh"]
+    command: ["WH-001"]
+
+  wh001_redis:
+    <<: *redis
+  wh001_api:
+    <<: *wh
+    environment:
+      <<: *wh-env
+      WAREHOUSE_ID: WH-001
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://wh001_redis:6379/0
+    ports: ["8101:8000"]
+    depends_on:
+      wh001_db_init: {condition: service_completed_successfully}
+      wh001_redis: {condition: service_healthy}
+      rabbitmq_topology: {condition: service_completed_successfully}
+  wh001_worker:
+    <<: *wh
+    command: ["python", "-m", "workers.outbox_relay"]
+    environment:
+      <<: *wh-env
+      WAREHOUSE_ID: WH-001
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      wh001_db_init: {condition: service_completed_successfully}
+      rabbitmq_topology: {condition: service_completed_successfully}
+  wh001_commands:
+    <<: *wh
+    command: ["python", "-m", "workers.commands"]
+    environment:
+      <<: *wh-env
+      WAREHOUSE_ID: WH-001
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://wh001_redis:6379/0
+      CHAOS_FAIL_STEP: ${CHAOS_FAIL_STEP:-}
+    depends_on:
+      wh001_db_init: {condition: service_completed_successfully}
+      rabbitmq_topology: {condition: service_completed_successfully}
+
+  # ---- WH-002 ----
+  wh002_db:
+    <<: *db
+    environment: {POSTGRES_USER: admin, POSTGRES_PASSWORD: "${DB_PASSWORD}", POSTGRES_DB: platform, WAREHOUSE_ID: WH-002}
+    volumes:
+      - wh002_pg:/var/lib/postgresql/data
+      - ./sql/warehouse:/sql:ro
+      - ./sql/warehouse/init.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
+  wh002_redis:
+    <<: *redis
+  wh002_api:
+    <<: *wh
+    environment:
+      <<: *wh-env
+      WAREHOUSE_ID: WH-002
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD}@wh002_db:5432/platform
+      REDIS_URL: redis://wh002_redis:6379/0
+    ports: ["8102:8000"]
+    depends_on:
+      wh002_db: {condition: service_healthy}
+      wh002_redis: {condition: service_healthy}
+      rabbitmq_topology: {condition: service_completed_successfully}
+  wh002_worker:
+    <<: *wh
+    command: ["python", "-m", "workers.outbox_relay"]
+    environment:
+      <<: *wh-env
+      WAREHOUSE_ID: WH-002
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD}@wh002_db:5432/platform
+    depends_on:
+      wh002_db: {condition: service_healthy}
+      rabbitmq_topology: {condition: service_completed_successfully}
+  wh002_commands:
+    <<: *wh
+    command: ["python", "-m", "workers.commands"]
+    environment:
+      <<: *wh-env
+      WAREHOUSE_ID: WH-002
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD}@wh002_db:5432/platform
+      REDIS_URL: redis://wh002_redis:6379/0
+      CHAOS_FAIL_STEP: ${CHAOS_FAIL_STEP:-}
+    depends_on:
+      wh002_db: {condition: service_healthy}
+      rabbitmq_topology: {condition: service_completed_successfully}
+
+  # ---- WH-003 ----
+  wh003_db:
+    <<: *db
+    environment: {POSTGRES_USER: admin, POSTGRES_PASSWORD: "${DB_PASSWORD}", POSTGRES_DB: platform, WAREHOUSE_ID: WH-003}
+    volumes:
+      - wh003_pg:/var/lib/postgresql/data
+      - ./sql/warehouse:/sql:ro
+      - ./sql/warehouse/init.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
+  wh003_redis:
+    <<: *redis
+  wh003_api:
+    <<: *wh
+    environment:
+      <<: *wh-env
+      WAREHOUSE_ID: WH-003
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD}@wh003_db:5432/platform
+      REDIS_URL: redis://wh003_redis:6379/0
+    ports: ["8103:8000"]
+    depends_on:
+      wh003_db: {condition: service_healthy}
+      wh003_redis: {condition: service_healthy}
+      rabbitmq_topology: {condition: service_completed_successfully}
+  wh003_worker:
+    <<: *wh
+    command: ["python", "-m", "workers.outbox_relay"]
+    environment:
+      <<: *wh-env
+      WAREHOUSE_ID: WH-003
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD}@wh003_db:5432/platform
+    depends_on:
+      wh003_db: {condition: service_healthy}
+      rabbitmq_topology: {condition: service_completed_successfully}
+  wh003_commands:
+    <<: *wh
+    command: ["python", "-m", "workers.commands"]
+    environment:
+      <<: *wh-env
+      WAREHOUSE_ID: WH-003
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD}@wh003_db:5432/platform
+      REDIS_URL: redis://wh003_redis:6379/0
+      CHAOS_FAIL_STEP: ${CHAOS_FAIL_STEP:-}
+    depends_on:
+      wh003_db: {condition: service_healthy}
+      rabbitmq_topology: {condition: service_completed_successfully}
+
+  # ---- Central ----
+  central_db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment: {POSTGRES_USER: central, POSTGRES_PASSWORD: "${DB_PASSWORD}", POSTGRES_DB: central}
+    volumes:
+      - central_pg:/var/lib/postgresql/data
+      - ./sql/central/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U central -d central"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  central_api:
+    image: ${ECR_REGISTRY}/central:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg2://central:${DB_PASSWORD}@central_db:5432/central
+      API_KEY: ${CENTRAL_API_KEY}
+      WAREHOUSE_API_KEY: ${API_KEY}
+      WAREHOUSE_URLS: WH-001=http://wh001_api:8000,WH-002=http://wh002_api:8000,WH-003=http://wh003_api:8000
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+    ports: ["8004:8000"]
+    depends_on:
+      central_db: {condition: service_healthy}
+  central_worker:
+    image: ${ECR_REGISTRY}/central:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: ["python", "-m", "app.workers.main"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://central:${DB_PASSWORD}@central_db:5432/central
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+    depends_on:
+      central_db: {condition: service_healthy}
+      rabbitmq_topology: {condition: service_completed_successfully}
+
+  # ---- Reporte diario (J-08): corre una vez y termina ----
+  #   docker compose --profile batch run --rm batch python -m batch.daily_report --date YYYY-MM-DD
+  # Escribe en S3 real (sin S3_ENDPOINT_URL) con el perfil de la instancia.
+  batch:
+    image: ${ECR_REGISTRY}/batch:${IMAGE_TAG:-latest}
+    profiles: ["batch"]
+    restart: "no"
+    environment:
+      WH001_API_URL: http://wh001_api:8000
+      WH002_API_URL: http://wh002_api:8000
+      WH003_API_URL: http://wh003_api:8000
+      API_KEY: ${API_KEY}
+      CENTRAL_API_URL: http://central_api:8000
+      CENTRAL_API_KEY: ${CENTRAL_API_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+    depends_on:
+      central_api: {condition: service_started}
+
+volumes:
+  rabbitmq_data: {}
+  wh002_pg: {}
+  wh003_pg: {}
+  central_pg: {}

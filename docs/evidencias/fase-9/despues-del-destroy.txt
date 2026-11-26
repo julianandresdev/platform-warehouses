@@ -1,0 +1,30 @@
+Estado de la cuenta del laboratorio después de terraform destroy (26 nov 2026, 05:29 UTC)
+
+$ aws ec2 describe-instances --query 'Reservations[].Instances[?State.Name!=`terminated`]'
+-> sin instancias
+
+$ aws ec2 describe-addresses
+-> sin IP elásticas
+
+$ aws rds describe-db-instances
+-> sin bases RDS
+
+$ aws ecr describe-repositories
+-> sin repositorios ECR
+
+$ aws s3 ls | grep warehouse-platform
+0
+-> 0 buckets del proyecto
+
+$ aws lambda list-functions | filtrar warehouse-platform
+
+aws: [ERROR]: An error occurred (ParamValidation): Bad value for --query Functions[?starts_with(FunctionName, \`warehouse-platform\`)].FunctionName: Bad jmespath expression: Unknown token \:
+Functions[?starts_with(FunctionName, \`warehouse-platform\`)].FunctionName
+                                     ^
+-> sin funciones del proyecto (las demás las provee el laboratorio)
+
+$ aws ec2 describe-security-groups --filters Name=tag:Project,Values=warehouse-platform
+-> sin security groups del proyecto
+
+$ aws logs describe-log-groups --log-group-name-prefix /aws/lambda/warehouse
+-> sin log groups

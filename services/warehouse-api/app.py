@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 import cache
 import config
+from common.metrics import observe_request
 import schemas
 import services
 from common.correlation import CorrelationIdMiddleware
@@ -30,6 +31,7 @@ from common.logging import configure_logging
 from common.events import new_event
 from common.outbox import add_event
 from database import get_db
+from pool_errors import register_pool_error_handler
 
 configure_logging("warehouse-api", config.WAREHOUSE_ID, config.LOG_LEVEL)
 logger = logging.getLogger("warehouse-api")
@@ -51,6 +53,7 @@ app = FastAPI(
 async def log_requests(request, call_next):
     start = time.perf_counter()
     response = await call_next(request)
+    observe_request(request, response.status_code, time.perf_counter() - start)
     logger.info(
         "request",
         extra={
@@ -62,6 +65,8 @@ async def log_requests(request, call_next):
     )
     return response
 
+
+register_pool_error_handler(app)
 
 # Se agrega al final para que sea la capa más externa: el correlation ID ya está
 # fijado cuando corre el log de arriba.

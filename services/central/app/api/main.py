@@ -11,7 +11,7 @@ from uuid import UUID
 
 from fastapi import (
     APIRouter, Depends, FastAPI,
-    Header, HTTPException, Query, status
+    Header, HTTPException, Query, Response, status
 )
 from pydantic import AwareDatetime, BaseModel, Field
 from sqlalchemy import text
@@ -20,6 +20,9 @@ from sqlalchemy.orm import Session
 
 from common.correlation import CorrelationIdMiddleware
 from common.logging import configure_logging
+from common.metrics import observe_request
+from fastapi.responses import Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from fastapi import Request
 from starlette.concurrency import run_in_threadpool
@@ -61,6 +64,7 @@ async def log_requests(request, call_next):
     start = time.perf_counter()
 
     response = await call_next(request)
+    observe_request(request, response.status_code, time.perf_counter() - start)
 
     logger.info(
         "request",
@@ -108,6 +112,11 @@ protected = APIRouter(
 # --------------------------------------------------
 # HEALTH CHECKS
 # --------------------------------------------------
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 
 @app.get("/health")
 def health():
@@ -208,6 +217,70 @@ def register_batch_run(
         "status": batch.status
     }
 
+
+
+# --------------------------------------------------
+# REGISTRO DE REPORTES (LAMBDA report-validator, S-08)
+# --------------------------------------------------
+
+class ReportCreate(BaseModel):
+    object_key: str = Field(min_length=1, max_length=1024)
+    status: str = Field(min_length=1, max_length=30)
+    size: int | None = Field(default=None, ge=0)
+    checksum: str | None = Field(default=None, max_length=64)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+@protected.post("/internal/reports")
+def register_report(
+    report: ReportCreate,
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    """Registra el resultado de validar un objeto de ``reports/`` (tabla ``reports``).
+
+    La llave del objeto es única: repetir el batch de un día vuelve a subir la misma
+    llave, así que un segundo registro actualiza la fila (200) en vez de fallar.
+    """
+
+    try:
+        inserted = db.execute(
+            text("""
+                INSERT INTO reports (object_key, status, size, checksum, metadata)
+                VALUES (:object_key, :status, :size, :checksum, CAST(:metadata AS JSONB))
+                ON CONFLICT (object_key) DO UPDATE
+                SET status = EXCLUDED.status,
+                    size = EXCLUDED.size,
+                    checksum = EXCLUDED.checksum,
+                    metadata = EXCLUDED.metadata
+                RETURNING (xmax = 0) AS inserted
+            """),
+            {
+                "object_key": report.object_key,
+                "status": report.status,
+                "size": report.size,
+                "checksum": report.checksum,
+                "metadata": json.dumps(report.metadata),
+            }
+        ).scalar_one()
+        db.commit()
+
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("report_registration_failed")
+        raise HTTPException(
+            status_code=503,
+            detail="No se pudo registrar el reporte"
+        )
+
+    response.status_code = (
+        status.HTTP_201_CREATED if inserted else status.HTTP_200_OK
+    )
+    logger.info(
+        "report_registered",
+        extra={"object_key": report.object_key, "status": report.status}
+    )
+    return {"object_key": report.object_key, "status": report.status}
 
 
 # --------------------------------------------------
