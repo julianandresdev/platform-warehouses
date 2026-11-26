@@ -1,0 +1,11 @@
+-----------------------------------------------------------------------------------
+|                               DescribeDBInstances                               |
++----------+----------------------------------------------------------------------+
+|  Clase   |  db.t3.micro                                                         |
+|  Endpoint|  warehouse-platform-wh001.cv2e40yoyy90.us-east-1.rds.amazonaws.com   |
+|  Estado  |  available                                                           |
+|  Id      |  warehouse-platform-wh001                                            |
+|  Motor   |  postgres                                                            |
+|  Publica |  False                                                               |
+|  Version |  16.13                                                               |
++----------+----------------------------------------------------------------------+

@@ -3,6 +3,8 @@ resource "aws_ecr_repository" "this" {
 
   name                 = each.value
   image_tag_mutability = "MUTABLE"
+  # Laboratorio: permite `terraform destroy` aunque el repositorio tenga imagenes.
+  force_delete = true
 
   image_scanning_configuration {
     scan_on_push = true

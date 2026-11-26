@@ -2,7 +2,7 @@
 
 ## Estado
 
-Propuesto. Santiago debe confirmar la topología final y la evidencia del laboratorio.
+Aceptado. Implementado y probado en el laboratorio el 26 de noviembre de 2026 (S-09, issue #30). Responsable asignado: Santiago.
 
 ## Contexto y alternativas
 
@@ -14,4 +14,10 @@ Usar Terraform para aprovisionar la infraestructura de AWS. El plan contempla im
 
 ## Consecuencias y validación
 
-La topología depende de permisos, cuotas, región y estado de Terraform. La [configuración disponible](../../infrastructure/terraform/main.tf) documenta S3, Lambda, CloudWatch y permisos asociados. La validación de la topología completa, el runbook y la comprobación de recursos apagados quedan en [S-09](https://github.com/julianandresdev/platform-warehouses/issues/30). Ver también [despliegue AWS](../aws.md).
+- **Topología probada:** una EC2 `t3.large` con toda la plataforma en Compose (imágenes de ECR), WH-001 en RDS, S3 con la Lambda y la central con IP elástica para que la Lambda conozca su URL. Humo, batch → S3 → Lambda → central y la demo corrieron; después `terraform destroy` dejó la cuenta limpia. Ver [aws.md](../aws.md) y la [evidencia](../evidencias/fase-9/).
+- **Una sola EC2** concentra todo: no hay alta disponibilidad, y es lo que cabe en el laboratorio y en el presupuesto.
+- **Arranque por S3:** la instancia descarga el `docker-compose.yaml` y los SQL de `s3://<bucket>/deploy/`, que sube `scripts/aws-bundle.sh`. Así no hace falta SSH ni construir en la instancia.
+- **Sin SSH ni SSM:** no hay forma de entrar a la instancia. Los logs del arranque y de los contenedores se suben a `logs/` en S3 para diagnosticar.
+- **El bucket se crea con la CLI de AWS**, no con `aws_s3_bucket`, porque una política del laboratorio impide leer el recurso (detalle en aws.md).
+- **Secretos:** la clave de RDS y las API keys quedan en el estado de Terraform y en el `user_data`; la de la central, además, en una variable de entorno de la Lambda. Es aceptable en el laboratorio, no en producción.
+- **Costo:** estimado en menos de USD 0,10 para la sesión (no medido).

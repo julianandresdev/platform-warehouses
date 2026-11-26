@@ -1,0 +1,83 @@
+
+$ curl -s http://18.215.35.17:8101/inventory/P-001 -H 'X-API-Key: $API_KEY' -D - -o /dev/null | grep -iE 'HTTP/|x-cache'
+HTTP/1.1 200 OK
+x-cache: MISS
+
+$ curl -s http://18.215.35.17:8101/inventory/P-001 -H 'X-API-Key: $API_KEY' -D - -o /dev/null | grep -iE 'HTTP/|x-cache'
+HTTP/1.1 200 OK
+x-cache: HIT
+
+$ curl -s -X POST http://18.215.35.17:8101/inventory/movements -H 'X-API-Key: $API_KEY' -H 'X-Correlation-ID: COR-DEMO-AWS' -H 'Content-Type: application/json' -d '{"sku":"P-001","type":"RECEIPT","quantity":5,"reference":"demo"}' | python3 -m json.tool | head -12
+{
+    "id": 13,
+    "sku": "P-001",
+    "product_id": 1,
+    "warehouse_id": "WH-001",
+    "type": "RECEIPT",
+    "quantity": 5,
+    "reference": "demo",
+    "created_at": "2026-11-26T05:24:23.438715"
+}
+
+$ curl -s http://18.215.35.17:8101/inventory/P-001 -H 'X-API-Key: $API_KEY' -D - | grep -iE 'x-cache|quantity|"version"'
+x-cache: MISS
+{"id":1,"sku":"P-001","product_id":1,"warehouse_id":"WH-001","quantity":104,"reserved_quantity":0,"available_quantity":104,"version":4,"updated_at":"2026-11-26T05:24:23.438715"}
+
+$ curl -s http://18.215.35.17:8004/global/inventory/P-001 -H 'X-API-Key: $CENTRAL_API_KEY' | python3 -m json.tool | head -30
+{
+    "sku": "P-001",
+    "total_quantity": 125,
+    "total_reserved": 0,
+    "total_available": 125,
+    "as_of": "2026-11-26T05:24:23+00:00",
+    "warehouses": [
+        {
+            "warehouse_id": "WH-001",
+            "quantity": 104,
+            "reserved_quantity": 0,
+            "available_quantity": 104,
+            "version": 4,
+            "updated_at": "2026-11-26T05:24:23+00:00",
+            "last_seen_at": "2026-11-26T05:24:03+00:00",
+            "stale": false
+        },
+        {
+            "warehouse_id": "WH-002",
+            "quantity": 21,
+            "reserved_quantity": 0,
+            "available_quantity": 21,
+            "version": 2,
+            "updated_at": "2026-11-26T05:23:18+00:00",
+            "last_seen_at": "2026-11-26T05:24:01+00:00",
+            "stale": false
+        }
+    ]
+}
+
+$ curl -s -u guest:guest http://18.215.35.17:15672/api/overview | python3 -c "import sys,json;d=json.load(sys.stdin);print({'publicados':d['message_stats']['publish'],'rabbitmq':d['rabbitmq_version']})"
+{'publicados': 22, 'rabbitmq': '3.13.7'}
+
+$ curl -s -X POST http://18.215.35.17:8004/transfers -H 'X-API-Key: $CENTRAL_API_KEY' -H 'Idempotency-Key: demo-aws-1' -H 'X-Correlation-ID: COR-DEMO-AWS-T1' -H 'Content-Type: application/json' -d '{"source_warehouse_id":"WH-001","destination_warehouse_id":"WH-002","sku":"P-001","quantity":30}'
+{"transfer_id":"fe39ed17-11a1-413e-a4a8-68a7d283ca2c","status":"PROCESSING"}
+$ curl -s http://18.215.35.17:8004/transfers/fe39ed17-11a1-413e-a4a8-68a7d283ca2c -H 'X-API-Key: $CENTRAL_API_KEY' | python3 -c "import sys,json;d=json.load(sys.stdin);print(d['status']);print(' -> '.join(h['new_status'] for h in d['history']))"
+COMPLETED
+REQUESTED -> RESERVING_SOURCE -> SOURCE_RESERVED -> IN_TRANSIT -> DESTINATION_PENDING -> DESTINATION_RECEIVED -> COMPLETED
+
+$ curl -s http://18.215.35.17:8101/inventory/P-001 -H 'X-API-Key: $API_KEY' | python3 -c "import sys,json;d=json.load(sys.stdin);print('WH-001 P-001 =',d['quantity'])"; curl -s http://18.215.35.17:8102/inventory/P-001 -H 'X-API-Key: $API_KEY' | python3 -c "import sys,json;d=json.load(sys.stdin);print('WH-002 P-001 =',d['quantity'])"
+WH-001 P-001 = 74
+WH-002 P-001 = 51
+
+$ curl -s -o /dev/null -w 'crear SOLO-DEMO en WH-001: HTTP %{http_code}
+' -X POST http://18.215.35.17:8101/products -H 'X-API-Key: $API_KEY' -H 'Content-Type: application/json' -d '{"sku":"SOLO-DEMO","name":"Solo en WH-001","unit":"unit"}'
+crear SOLO-DEMO en WH-001: HTTP 201
+
+$ curl -s -o /dev/null -w 'recibir 40 unidades: HTTP %{http_code}
+' -X POST http://18.215.35.17:8101/inventory/movements -H 'X-API-Key: $API_KEY' -H 'Content-Type: application/json' -d '{"sku":"SOLO-DEMO","type":"RECEIPT","quantity":40}'
+recibir 40 unidades: HTTP 201
+
+$ curl -s http://18.215.35.17:8004/transfers/f5073e4a-8b08-4216-a690-b6ddd2c68cf0 -H 'X-API-Key: $CENTRAL_API_KEY' | python3 -c "import sys,json;d=json.load(sys.stdin);print(d['status'], d.get('reason'));print(' -> '.join(h['new_status'] for h in d['history']))"
+CANCELLED SKU_NOT_FOUND
+REQUESTED -> RESERVING_SOURCE -> SOURCE_RESERVED -> IN_TRANSIT -> DESTINATION_PENDING -> COMPENSATING -> CANCELLED
+
+$ curl -s http://18.215.35.17:8101/inventory/SOLO-DEMO -H 'X-API-Key: $API_KEY' | python3 -c "import sys,json;d=json.load(sys.stdin);print('WH-001 SOLO-DEMO: quantity',d['quantity'],'reserved',d['reserved_quantity'])"
+WH-001 SOLO-DEMO: quantity 40 reserved 0

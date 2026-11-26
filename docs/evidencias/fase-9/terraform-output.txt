@@ -1,0 +1,12 @@
+ec2_public_ip = "18.215.35.17"
+ecr_repository_urls = {
+  "batch" = "<cuenta>.dkr.ecr.us-east-1.amazonaws.com/batch"
+  "central" = "<cuenta>.dkr.ecr.us-east-1.amazonaws.com/central"
+  "iot" = "<cuenta>.dkr.ecr.us-east-1.amazonaws.com/iot"
+  "warehouse" = "<cuenta>.dkr.ecr.us-east-1.amazonaws.com/warehouse"
+}
+eventbridge_bus = "default"
+lambda_name = "warehouse-platform-export-handler"
+rds_endpoint = "warehouse-platform-wh001.cv2e40yoyy90.us-east-1.rds.amazonaws.com:5432"
+region = "us-east-1"
+s3_bucket = "warehouse-platform-<cuenta>-lab"
