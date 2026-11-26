@@ -1,0 +1,36 @@
+2026-11-25 23:59:39       8654 deploy/docker-compose.yaml
+2026-11-25 23:59:40        901 deploy/init-rds.sh
+2026-11-25 23:59:43       4855 deploy/sql/central/schema.sql
+2026-11-25 23:59:41        790 deploy/sql/warehouse/init.sh
+2026-11-25 23:59:42          0 deploy/sql/warehouse/migrations/.gitkeep
+2026-11-25 23:59:42        616 deploy/sql/warehouse/migrations/001_outbox.sql
+2026-11-25 23:59:42        514 deploy/sql/warehouse/migrations/002_report_jobs.sql
+2026-11-25 23:59:42       1808 deploy/sql/warehouse/migrations/002_saga_commands.sql
+2026-11-25 23:59:42       3065 deploy/sql/warehouse/schema.sql
+2026-11-25 23:59:42       1599 deploy/sql/warehouse/seed/WH-001.sql
+2026-11-25 23:59:42       1595 deploy/sql/warehouse/seed/WH-002.sql
+2026-11-25 23:59:42       1595 deploy/sql/warehouse/seed/WH-003.sql
+2026-11-26 00:25:05        246 metadata/reports/daily/2026-11-26/summary.json
+2026-11-26 00:25:04        953 reports/daily/2026-11-26/summary.json
+2026-11-26 00:25:00       2216 warehouses/WH-001/2026/11/inventory-2026-11-26.json
+2026-11-26 00:25:01       2010 warehouses/WH-002/2026/11/inventory-2026-11-26.json
+2026-11-26 00:25:03       2010 warehouses/WH-003/2026/11/inventory-2026-11-26.json
+
+$ aws s3api head-object ... reports/daily/2026-11-26/summary.json
+{
+    "Size": 953,
+    "Metadata": {
+        "correlation-id": "COR-20261126-779fd6aa"
+    }
+}
+
+metadata/reports/daily/2026-11-26/summary.json:
+{
+    "checksum": "aa4952db19c29323ecfcd992da43fdd2a1060d05f82c2ae9161c684467fce3a0",
+    "correlation_id": "COR-20261126-779fd6aa",
+    "object_key": "reports/daily/2026-11-26/summary.json",
+    "reason": null,
+    "record_count": 41,
+    "size": 953,
+    "status": "VALID"
+}

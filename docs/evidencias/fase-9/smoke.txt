@@ -1,0 +1,14 @@
+PASS  WH-001 /health
+PASS  WH-001 /health/ready (base de datos)
+PASS  WH-001 GET /inventory/P-001
+PASS  WH-002 /health
+PASS  WH-002 /health/ready (base de datos)
+PASS  WH-002 GET /inventory/P-001
+PASS  WH-003 /health
+PASS  WH-003 /health/ready (base de datos)
+PASS  WH-003 GET /inventory/P-001
+PASS  central /health/ready
+PASS  transferencia 389d26cd-7d02-47e8-86db-e5f37e6edc4e COMPLETED (COR-SMOKE-1795670597)
+PASS  central GET /global/inventory (vista global)
+
+Todo en orden.

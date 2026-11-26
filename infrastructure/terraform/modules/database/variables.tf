@@ -27,8 +27,8 @@ variable "db_name" {
 
 variable "username" {
   type        = string
-  description = "Usuario administrador de la base"
-  default     = "admin"
+  description = "Usuario administrador de la base (RDS PostgreSQL no admite `admin`: es una palabra reservada del motor)"
+  default     = "warehouse"
 }
 
 variable "allocated_storage" {

@@ -16,7 +16,14 @@ resource "aws_instance" "platform" {
     compose_dir     = var.compose_dir
     compose_version = var.compose_version
     env_vars        = var.env_vars
+    bundle_s3_uri   = var.bundle_s3_uri
   })
 
   tags = { Name = "${var.project_prefix}-platform", Project = var.project_prefix, ManagedBy = "terraform" }
+}
+
+resource "aws_eip_association" "platform" {
+  count         = var.associate_eip ? 1 : 0
+  instance_id   = aws_instance.platform.id
+  allocation_id = var.eip_allocation_id
 }

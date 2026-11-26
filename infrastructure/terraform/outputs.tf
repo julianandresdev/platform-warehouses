@@ -15,8 +15,8 @@ output "eventbridge_bus" {
 }
 
 output "ec2_public_ip" {
-  description = "IP pública de la EC2 de la plataforma"
-  value       = module.compute.public_ip
+  description = "IP pública (elástica) de la EC2 de la plataforma"
+  value       = aws_eip.platform.public_ip
 }
 
 output "rds_endpoint" {

@@ -56,3 +56,21 @@ variable "extra_env_vars" {
   default     = {}
   sensitive   = true
 }
+
+variable "api_key" {
+  type        = string
+  description = "X-API-Key de las APIs de bodega (va al .env de la EC2)"
+  sensitive   = true
+}
+
+variable "central_api_key" {
+  type        = string
+  description = "X-API-Key de la API central; la Lambda la usa para POST /internal/reports"
+  sensitive   = true
+}
+
+variable "central_api_port" {
+  type        = number
+  description = "Puerto público de la API central en la EC2 (debe estar en public_api_ports)"
+  default     = 8004
+}
