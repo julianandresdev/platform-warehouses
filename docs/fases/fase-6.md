@@ -35,6 +35,21 @@ REQUESTED -> RESERVING_SOURCE -> SOURCE_RESERVED
 -> IN_TRANSIT -> DESTINATION_PENDING
 -> DESTINATION_RECEIVED -> COMPLETED.
 
+```mermaid
+stateDiagram-v2
+    [*] --> REQUESTED
+    REQUESTED --> RESERVING_SOURCE: RESERVE_STOCK
+    RESERVING_SOURCE --> FAILED: rechazo o vencimiento
+    RESERVING_SOURCE --> SOURCE_RESERVED: STOCK_RESERVED
+    SOURCE_RESERVED --> IN_TRANSIT: TRANSFER_SHIPPED
+    IN_TRANSIT --> DESTINATION_PENDING: RECEIVE_TRANSFER
+    DESTINATION_PENDING --> DESTINATION_RECEIVED: TRANSFER_RECEIVED
+    DESTINATION_RECEIVED --> COMPLETED
+    SOURCE_RESERVED --> COMPENSATING: TRANSFER_SHIP_FAILED
+    DESTINATION_PENDING --> COMPENSATING: TRANSFER_RECEIVE_FAILED
+    COMPENSATING --> CANCELLED: RESERVATION_RELEASED o STOCK_RETURNED
+```
+
 ### Manejo de fallos
 
 - Reserva rechazada: estado FAILED.
@@ -83,6 +98,22 @@ REQUESTED -> RESERVING_SOURCE -> SOURCE_RESERVED
 | Idempotencia HTTP real | Exitoso |
 | Compensacion real por rechazo del destino | Exitoso |
 | Compensacion por fallo de envio inducido | Exitoso |
+
+### Cobertura de los seis experimentos del plan
+
+El [registro de integración](../evidencias/fase-6/e06-integracion.md)
+documenta el caso 100/20 → 70/50, con 175 unidades totales al
+incluir WH-003. Las cinco corridas de ese registro abarcan casos
+distintos de los seis experimentos del plan.
+
+| Experimento del plan | Evidencia disponible | Evidencia por completar |
+| --- | --- | --- |
+| Origen detenido antes de reservar | Timeout de reserva verificado | Historial con la bodega detenida e inventario antes y después |
+| Fallo después de reservar | Corrida real con liberación anticipada de la reserva y conservación de 175 unidades | Repetición con la inyección prevista por el plan |
+| Destino temporalmente caído | Destino pendiente y alerta verificados con simulación | Historial desde la detención de WH-002 hasta completar la transferencia |
+| Comando RabbitMQ duplicado | Eventos duplicados probados e idempotencia HTTP verificada con bodegas reales | Republicación del comando y comprobación de que no repite el movimiento |
+| Timeout con confirmación tardía | Timeout y liberación tardía verificados | Historial de la corrida con pausa del consumidor de origen |
+| Reinicio del orquestador | Recuperación del worker verificada | Historial de una transferencia real e inventario antes y después |
 
 ### Limitaciones y pendientes
 
