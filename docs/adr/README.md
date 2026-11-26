@@ -24,11 +24,11 @@ documentar nuevas decisiones.
 | [0012](0012-proyeccion-cqrs.md) | CQRS y Heartbeat | Esteban | Recuperado de E-04/E-06 |
 | [0013](0013-saga-orquestada.md) | Saga orquestada | Esteban | Recuperado de E-06 |
 | [0014](0014-batch-csv-s3.md) | Batch y S3 | Julian / Santiago | Propuesta pendiente |
-| 0015 | Reintentos, DLQ e idempotencia | David | Pendiente |
-| 0016 | Prometheus y Grafana | Santiago | Pendiente |
+| [0015](0015-reintentos-dlq-idempotencia.md) | Reintentos, DLQ e idempotencia | David | Borrador pendiente de revisión |
+| [0016](0016-prometheus-y-grafana.md) | Prometheus y Grafana | Santiago | Borrador pendiente de revisión |
 | [0017](0017-lambda-validacion-eventos.md) | Lambda fuera de la VPC | Santiago | Propuesta pendiente |
-| 0018 | Despliegue AWS Learner Lab | Santiago | Pendiente |
-| 0019 | MQTT, QoS e IoT | David | Pendiente |
+| [0018](0018-despliegue-aws-learner-lab.md) | Despliegue AWS Learner Lab | Santiago | Borrador pendiente de revisión |
+| [0019](0019-mqtt-qos-y-deduplicacion.md) | MQTT, QoS e IoT | David | Borrador pendiente de revisión |
 
 ## Decisiones adicionales
 

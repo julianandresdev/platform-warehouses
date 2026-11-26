@@ -1,6 +1,6 @@
 # Preparacion de la defensa
 
-Estado: Borrador consolidado pendiente de revision grupal.
+Guía de ensayo pendiente de revisión grupal. Los títulos y la numeración son provisionales hasta cotejarlos con el enunciado del profesor.
 
 ## Índice
 
@@ -16,21 +16,75 @@ Estado: Borrador consolidado pendiente de revision grupal.
 
 Responsable: Santiago.
 
-Pendiente de incorporar las respuestas del responsable.
+### 1. ¿Por qué separar la API de bodega y la central?
+
+La bodega acepta escrituras locales y valida el stock. La central consolida lecturas y coordina transferencias. Separar ambos servicios permite operar una bodega sin invocar la central en cada movimiento. La vista global puede tener retraso. [Arquitectura](architecture.md)
+
+### 2. ¿Qué datos deben persistir?
+
+PostgreSQL conserva productos, inventario y movimientos. También persiste el outbox para recuperar eventos después de un fallo. Redis puede reconstruir la caché a partir de PostgreSQL. [Fase 1](fases/fase-1.md) · [ADR de Outbox](adr/0006-patron-outbox.md)
+
+### 3. ¿Cómo se evita vender stock dos veces?
+
+La operación bloquea la fila de inventario durante la transacción, comprueba la cantidad disponible y registra el movimiento junto al cambio de stock. Las salidas concurrentes sobre el mismo producto se serializan, lo que puede aumentar la espera en productos calientes. [ADR de concurrencia](adr/0004-control-de-concurrencia-en-movimientos.md)
+
+### 4. ¿Por qué versionar el esquema SQL?
+
+Las migraciones permiten reproducir la estructura y conservar restricciones explícitas. Generar tablas al iniciar la aplicación simplifica el prototipo, pero dificulta auditar cambios sobre bases existentes. [ADR de esquema](adr/0003-schema-sql-como-fuente-de-verdad.md)
+
+### 5. ¿Qué gana el sistema con un balanceador?
+
+Nginx distribuye las consultas de WH-002 y puede intentar otra réplica ante ciertos fallos. Las réplicas comparten almacenamiento, por lo que agregar API no elimina un cuello de botella en PostgreSQL. [ADR de Nginx](adr/0009-nginx-y-health-checks-pasivos.md)
 
 
 ## Redis - Preguntas 6 a 10
 
 Responsable: Julian.
 
-Pendiente de incorporar las respuestas del responsable.
+### 6. ¿Por qué Cache Aside?
+
+La aplicación consulta Redis primero. Ante un miss, lee PostgreSQL y almacena la respuesta con TTL. Esto ahorra consultas repetidas y permite operar sin Redis, a cambio de una ventana de obsolescencia. [ADR de Redis](adr/0008-cache-aside-con-redis.md)
+
+### 7. ¿En qué momento se invalida el inventario?
+
+Después del commit. Invalidar antes permitiría que una lectura repueble la caché con el stock previo al commit. Una lectura ya iniciada aún puede repoblarla tarde, con el TTL como límite. [ADR de Redis](adr/0008-cache-aside-con-redis.md)
+
+### 8. ¿Para qué sirve el TTL?
+
+Limita cuánto dura una entrada sin renovarse y acota el impacto si falla el borrado. Un TTL más corto aumenta misses y carga en PostgreSQL. El valor documentado es 30 segundos. [ADR de Redis](adr/0008-cache-aside-con-redis.md)
+
+### 9. ¿Qué pasa si Redis falla?
+
+La API lee PostgreSQL y devuelve `X-Cache: BYPASS`. La prueba local de F10 observó HTTP 200 con más latencia durante la caída. [Evidencia F10 en E-07](https://github.com/julianandresdev/platform-warehouses/blob/7b84e133a8eb3c5b8d06c98298f7026723c07fa9/docs/fases/fase-10.md)
+
+### 10. ¿Cómo se mide el aporte de la caché?
+
+Comparar Redis habilitado y deshabilitado con la misma carga. En F2 se registraron 1795,7 frente a 827,4 solicitudes por segundo y P95 de 52 frente a 130 ms. Son resultados del entorno de la prueba. [Resultados F2](evidencias/fase-2/resumen.md)
 
 
 ## RabbitMQ - Preguntas 11 a 15
 
 Responsable: David.
 
-Pendiente de incorporar las respuestas del responsable.
+### 11. ¿Por qué RabbitMQ y exchanges separados?
+
+Los exchanges de eventos permiten suscriptores independientes por clave. Los comandos se dirigen a una bodega. La comunicación asíncrona absorbe interrupciones cortas a cambio de colas, retraso y coordinación adicional. [ADR de RabbitMQ](adr/0005-topologia-rabbitmq.md)
+
+### 12. ¿Qué problema resuelve Transactional Outbox?
+
+El movimiento y la fila de outbox se confirman en la misma transacción. Un relay publica cuando el broker esté disponible. Se evita perder el evento entre el commit y el envío, con la posibilidad de republicación. [ADR de Outbox](adr/0006-patron-outbox.md)
+
+### 13. ¿Cómo se evita aplicar dos veces un comando?
+
+El consumidor registra el identificador en la misma transacción que el efecto. Si ya existe, confirma la entrega sin repetir el movimiento. La proyección también protege el estado mediante versiones. [ADR de idempotencia](adr/0020-idempotencia-comandos-bodega.md)
+
+### 14. ¿Cuándo reintentar y cuándo enviar a DLQ?
+
+El plan reserva reintentos acotados para fallos transitorios y DLQ para errores permanentes o agotados. La validación de esa política pertenece a D-05. [ADR de reintentos](adr/0015-reintentos-dlq-idempotencia.md)
+
+### 15. ¿Qué pasa si el broker o el relay se detiene?
+
+Los eventos ya confirmados quedan en el outbox. Al recuperar el componente, el relay reanuda el envío. La proyección global puede quedar temporalmente atrasada. [Evidencia F10 en E-07](https://github.com/julianandresdev/platform-warehouses/blob/7b84e133a8eb3c5b8d06c98298f7026723c07fa9/docs/fases/fase-10.md)
 
 
 ## Distribucion y CQRS - Preguntas 16 a 24
@@ -232,14 +286,46 @@ Ver [resultados de Fase 7](fases/fase-7.md) y [archivos del experimento](evidenc
 
 Responsable: Santiago.
 
-Pendiente de incorporar las respuestas del responsable.
+### 25. ¿Qué se gana con Terraform?
+
+Permite revisar el plan, reproducir la configuración y auditar qué recursos quedan al desmontar el entorno. Requiere gestionar el estado y contar con permisos y cuotas del laboratorio. [ADR de despliegue](adr/0018-despliegue-aws-learner-lab.md)
+
+### 26. ¿Cómo se distribuyen las funciones en AWS?
+
+El diseño asigna imágenes a ECR, ejecución de servicios a EC2, persistencia relacional a RDS y reportes a S3. Lambda se activa por eventos de objetos. La topología final necesita evidencia de S-09. [Arquitectura](architecture.md)
+
+### 27. ¿Por qué MinIO en local y S3 en AWS?
+
+MinIO permite probar el flujo de objetos desde Compose. S3 aporta la integración administrada con el entorno AWS. Los permisos y notificaciones se verifican aparte. [ADR de almacenamiento](adr/0011-minio-local-y-s3-en-aws.md)
+
+### 28. ¿Cuándo utilizar un worker, un batch o Lambda?
+
+El worker se mantiene disponible para consumo continuo. Batch agrupa trabajo con horario o volumen definido. Lambda procesa eventos breves y puede tener arranque en frío. Las mediciones de AWS deben respaldar una comparación de duración y costo. [ADR de Lambda](adr/0017-lambda-validacion-eventos.md)
+
+### 29. ¿Cómo se controla el costo de la práctica?
+
+Registrar la duración y los recursos por sesión, verificar el resultado del desmontaje y contrastarlo con la hoja de gasto. El costo total requiere datos de la sesión de AWS. [Despliegue AWS](aws.md)
 
 
 ## Observabilidad - Preguntas 30 a 33
 
 Responsable: Julian.
 
-Pendiente de incorporar las respuestas del responsable.
+### 30. ¿Qué métricas se deben mirar durante una prueba de carga?
+
+RPS, P95/P99, errores, CPU, memoria y colas. En la vista global se añade el retraso de la proyección. Correlacionarlas permite ubicar el recurso saturado y distinguirlo de un generador de carga saturado. [Fase 11](fases/fase-11.md)
+
+### 31. ¿Cómo se sigue una transferencia?
+
+Propagar el identificador de correlación desde el POST inicial a los comandos, respuestas y logs. El historial de la API verifica el orden y el estado final. [Traza del PR de E-07](https://github.com/julianandresdev/platform-warehouses/blob/7b84e133a8eb3c5b8d06c98298f7026723c07fa9/docs/evidencias/fase-11/traza-transferencia-saga.json)
+
+### 32. ¿Qué indica el retraso de proyección?
+
+Mide cuánto tarda un evento en quedar reflejado en el modelo de lectura. El heartbeat mide si la bodega sigue reportando actividad. Una vista puede responder y arrastrar retraso aunque su HTTP sea exitoso. [ADR de CQRS](adr/0012-proyeccion-cqrs.md)
+
+### 33. ¿Qué aporta Grafana a un diagnóstico?
+
+Relacionar series de latencia, errores, CPU y colas en el mismo intervalo. Los logs sirven luego para explicar una operación concreta. Los dashboards definitivos deben verificarse durante una corrida real. [ADR de observabilidad](adr/0016-prometheus-y-grafana.md)
 
 
 ## Pregunta final: Escalamiento a 100 bodegas

@@ -39,20 +39,22 @@ Estado: Pendiente de integracion y validacion final.
 - [x] ADR-0010 sobre autenticacion mediante API Key.
 - [x] Borrador de preguntas 16 a 24.
 - [x] Borrador de la pregunta final: 100 bodegas.
-- [ ] Completar y revisar los 19 ADR.
-- [ ] Resolver correspondencia del ADR-0004.
-- [ ] Resolver numeracion duplicada del ADR-0014.
+- [x] Enlazar los 19 ADR previstos.
+- [ ] Revisar los borradores de ADR con sus responsables.
+- [x] Índice actualizado al tema real del ADR-0004 (concurrencia).
+- [x] Idempotencia de comandos identificada como ADR-0020.
+- [ ] Conciliar el contrato de lectura de Batch en ADR-0014.
 - [ ] Documentar las fases 1 a 12 con evidencias.
-- [ ] Consolidar las 33 respuestas de la defensa.
+- [x] Preparar 33 respuestas de ensayo para revisión.
+- [ ] Validar las respuestas de cada bloque con sus responsables.
 - [ ] Contrastar las preguntas con el enunciado original.
-- [ ] Actualizar README principal con ejecucion,
-  profiles y demo.
+- [x] README principal actualizado con ejecución, perfil de carga y enlaces de demo.
 
 ## Integracion pendiente
 
 - [ ] E-01: integracion de documentacion.
-- [ ] E-04: proyeccion CQRS.
-- [ ] E-05: fan-out y comparacion experimental.
+- [x] E-04: proyección CQRS integrada en main (PR #54).
+- [x] E-05: fan-out integrado en main a través de E-04 (PR #55 y #54).
 - [ ] E-06: Saga e integracion con J-07.
 - [ ] E-07: informe final y pruebas de resiliencia.
 - [ ] E-08: revision de arquitectura y defensa.
@@ -60,15 +62,22 @@ Estado: Pendiente de integracion y validacion final.
 
 ## Ensayo de la defensa
 
-Duracion prevista: 45 minutos.
+Duración prevista de 45 minutos. La fecha queda por acordar con el equipo.
+
+| Minutos | Actividad |
+| --- | --- |
+| 0–5 | Abrir la arquitectura y comprobar el entorno de la demo. |
+| 5–29 | Cuatro rondas de seis minutos. Cada integrante responde dos preguntas de otro bloque y muestra una evidencia. |
+| 29–39 | Ejecutar la demo de movimiento, transferencia y recuperación. |
+| 39–45 | Registrar respuestas por corregir y responsables. |
 
 Cada integrante debe responder preguntas de un
 bloque diferente al de su responsabilidad principal.
 
-- [ ] Santiago: bloque de otro integrante.
-- [ ] Julian: bloque de otro integrante.
-- [ ] David: bloque de otro integrante.
-- [ ] Esteban: bloque de otro integrante.
+- [ ] Santiago: Redis.
+- [ ] Julian: RabbitMQ.
+- [ ] David: Distribución y CQRS.
+- [ ] Esteban: Cloud.
 - [ ] Revisar errores y dudas del ensayo.
 - [ ] Validar el guion de demostracion.
 
