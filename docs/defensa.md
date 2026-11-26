@@ -37,9 +37,9 @@ Pendiente de incorporar las respuestas del responsable.
 
 Responsable: Esteban.
 
-Borrador tematico basado en las fases F4 a F7.
-La numeracion y redaccion deben contrastarse con
-las preguntas originales del profesor.
+Guía de ensayo basada en las fases F4 a F7. Los títulos y
+la numeración 16–24 son provisionales hasta cotejarlos
+con el enunciado del profesor.
 
 ### 16. ¿Por que utilizar una base de datos por bodega?
 
@@ -53,7 +53,7 @@ escalamiento independiente.
 La desventaja es que las consultas y transacciones
 globales requieren mecanismos distribuidos.
 
-Evidencia: arquitectura distribuida y pruebas F4.
+Ver [Fase 4](fases/fase-4.md) y el [Compose distribuido](../infrastructure/compose/compose.distributed.yml).
 
 ### 17. ¿Como escalar bodegas con cargas diferentes?
 
@@ -73,7 +73,7 @@ de datos puede convertirse en el nuevo cuello de botella.
 En F5 se registraron 382.98 solicitudes por segundo
 con una replica y 884.36 con tres replicas.
 
-Evidencia: docs/evidencias/fase-5/.
+Ver [comparación de rendimiento con Locust](evidencias/fase-5/comparacion-rendimiento.md).
 
 ### 18. ¿Por que utilizar Saga para las transferencias?
 
@@ -91,7 +91,7 @@ cuando ocurre un fallo.
 La desventaja es que existen estados intermedios
 y consistencia eventual.
 
-Evidencia: ADR-0013 y pruebas de E-06.
+Ver [ADR-0013](adr/0013-saga-orquestada.md) y el [registro de integración de E-06](https://github.com/julianandresdev/platform-warehouses/blob/3888c2043a6909f6cf5323ddf26e2f1229aae838/docs/evidencias/fase-6/e06-integracion.md).
 
 ### 19. ¿Por que Saga orquestada y no coreografiada?
 
@@ -108,7 +108,7 @@ y la recuperacion tras reinicios.
 La desventaja es la dependencia del coordinador
 para avanzar las transferencias.
 
-Evidencia: ADR-0013.
+Ver [ADR-0013](adr/0013-saga-orquestada.md).
 
 ### 20. ¿Que sucede cuando falla una transferencia?
 
@@ -117,7 +117,8 @@ La respuesta depende del estado de la transferencia.
 - Reserva rechazada: FAILED.
 - Reserva vencida despues de 30 segundos: FAILED.
 - Reserva confirmada tardia: RELEASE_RESERVATION.
-- Recepcion rechazada: RETURN_STOCK.
+- Envío rechazado: `TRANSFER_SHIP_FAILED` lleva a `COMPENSATING` y se emite `RELEASE_RESERVATION`.
+- Recepción rechazada: se emite `RETURN_STOCK`.
 - Compensacion confirmada: CANCELLED.
 - Destino temporalmente caido: DESTINATION_PENDING.
 
@@ -131,11 +132,12 @@ una alerta.
 El objetivo es conservar el inventario, incluyendo
 las unidades que se encuentran en transito.
 
-Las pruebas centrales simuladas fueron exitosas.
-La validacion integral de los seis experimentos
-debe confirmarse junto con J-07.
+E-06 registró 46 pruebas unitarias y cinco escenarios de
+integración exitosos, incluidas las compensaciones por
+rechazo del destino y por fallo de envío inducido. El PR
+de E-06 contiene esa evidencia.
 
-Evidencia: ADR-0013 y documentacion F6.
+Ver [resultados de F6 en E-06](https://github.com/julianandresdev/platform-warehouses/blob/3888c2043a6909f6cf5323ddf26e2f1229aae838/docs/fases/fase-6.md).
 
 ### 21. ¿Que es CQRS y por que lo utilizamos?
 
@@ -155,7 +157,7 @@ y mejora la disponibilidad de las consultas.
 La desventaja es la consistencia eventual y
 la complejidad de mantener la proyeccion.
 
-Evidencia: ADR-0012.
+Ver [ADR-0012](adr/0012-proyeccion-cqrs.md).
 
 ### 22. ¿Como se mantiene actualizado el Read Model?
 
@@ -177,7 +179,7 @@ informacion mas reciente.
 La proyeccion puede presentar retrasos, medidos
 mediante projection_lag_seconds.
 
-Evidencia: pruebas de versiones y duplicados E-04.
+Ver [pruebas de versiones de la proyección](../tests/unit/test_projection_version.py) y [Fase 7](fases/fase-7.md).
 
 ### 23. ¿Que ocurre si una bodega deja de responder?
 
@@ -195,7 +197,7 @@ Fan-out, en cambio, depende de las respuestas
 HTTP de las bodegas y puede devolver datos
 parciales o errores.
 
-Evidencia: experimento de caida de WH-002 en E-05.
+Ver [experimento de caída en Fase 7](fases/fase-7.md) y [resultado CQRS](evidencias/fase-7/cqrs_fallo_stats.csv).
 
 ### 24. ¿Que alternativa es mejor: Fan-out o CQRS?
 
@@ -209,7 +211,7 @@ En los experimentos locales de E-05 se obtuvieron:
 | Latencia media normal | 93.75 ms | 349.88 ms |
 | P95 normal | 200 ms | 580 ms |
 | Solicitudes por segundo | 98.52 | 42.64 |
-| Disponibilidad HTTP ante fallo | 100% | 0.58% |
+| Solicitudes exitosas ante el fallo probado | 100% (6283 de 6283) | 0.58% (8 de 1386) |
 
 Elegimos CQRS como mecanismo predeterminado
 porque presento menor latencia y mayor disponibilidad
@@ -224,7 +226,7 @@ datos a cambio de disponibilidad y desacoplamiento.
 Los resultados corresponden a pruebas locales
 y no son garantias de rendimiento en produccion.
 
-Evidencia: docs/fases/fase-7.md y experimentos E-05.
+Ver [resultados de Fase 7](fases/fase-7.md) y [archivos del experimento](evidencias/fase-7/).
 
 ## Cloud - Preguntas 25 a 29
 
