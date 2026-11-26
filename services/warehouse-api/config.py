@@ -13,6 +13,7 @@ REDIS_URL = os.getenv("REDIS_URL", "")
 CACHE_ENABLED = os.getenv("CACHE_ENABLED", "true").lower() == "true"
 CACHE_TTL_SECONDS = int(os.getenv("CACHE_TTL_SECONDS", "30"))
 REDIS_TIMEOUT_SECONDS = float(os.getenv("REDIS_TIMEOUT_SECONDS", "0.2"))
+CACHE_INVALIDATION = os.getenv("CACHE_INVALIDATION", "sync").strip().lower()
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
@@ -25,3 +26,5 @@ def validate_settings() -> None:
         raise RuntimeError("WAREHOUSE_ID debe tener entre 1 y 20 caracteres")
     if not API_KEY:
         raise RuntimeError("API_KEY no está configurada")
+    if CACHE_INVALIDATION not in {"sync", "async"}:
+        raise RuntimeError("CACHE_INVALIDATION debe ser 'sync' o 'async'")

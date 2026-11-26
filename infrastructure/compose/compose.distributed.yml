@@ -9,6 +9,7 @@ x-api: &api
     DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@db:5432/platform
     REDIS_URL: redis://redis:6379/0
     RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    CACHE_INVALIDATION: ${CACHE_INVALIDATION:-sync}
   expose: ["8000"]
   restart: unless-stopped
   healthcheck:
@@ -33,6 +34,27 @@ x-commands-worker: &commands-worker
     context: ../../services
     dockerfile: warehouse-api/Dockerfile
   command: ["python", "-m", "workers.commands"]
+
+x-cache-invalidation-worker: &cache-invalidation-worker
+  build:
+    context: ../../services
+    dockerfile: warehouse-api/Dockerfile
+  command: ["python", "-m", "workers.cache_invalidation"]
+  environment:
+    CACHE_ENABLED: ${CACHE_ENABLED:-true}
+    CACHE_INVALIDATION: ${CACHE_INVALIDATION:-sync}
+    RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  restart: unless-stopped
+
+x-reports-worker: &reports-worker
+  build:
+    context: ../../services
+    dockerfile: warehouse-api/Dockerfile
+  command: ["python", "-m", "workers.reports"]
+  environment:
+    RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
   restart: unless-stopped
 
 x-db-env: &db-env
@@ -98,6 +120,30 @@ services:
       wh001_db: {condition: service_healthy}
       rabbitmq: {condition: service_started}
     networks: [wh001, messaging]
+  wh001_cache_invalidation_worker:
+    <<: *cache-invalidation-worker
+    environment:
+      WAREHOUSE_ID: WH-001
+      REDIS_URL: redis://wh001_redis:6379/0
+      CACHE_ENABLED: ${CACHE_ENABLED:-true}
+      CACHE_INVALIDATION: ${CACHE_INVALIDATION:-sync}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      wh001_redis: {condition: service_healthy}
+      rabbitmq_topology: {condition: service_completed_successfully}
+    networks: [wh001, messaging]
+  wh001_reports_worker:
+    <<: *reports-worker
+    environment:
+      WAREHOUSE_ID: WH-001
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh001_db:5432/platform
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      wh001_db: {condition: service_healthy}
+      rabbitmq_topology: {condition: service_completed_successfully}
+    networks: [wh001, messaging]
 
   wh001_commands:
     <<: *commands-worker
@@ -150,6 +196,30 @@ services:
       wh002_db: {condition: service_healthy}
       rabbitmq: {condition: service_started}
     networks: [wh002, messaging]
+  wh002_cache_invalidation_worker:
+    <<: *cache-invalidation-worker
+    environment:
+      WAREHOUSE_ID: WH-002
+      REDIS_URL: redis://wh002_redis:6379/0
+      CACHE_ENABLED: ${CACHE_ENABLED:-true}
+      CACHE_INVALIDATION: ${CACHE_INVALIDATION:-sync}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      wh002_redis: {condition: service_healthy}
+      rabbitmq_topology: {condition: service_completed_successfully}
+    networks: [wh002, messaging]
+  wh002_reports_worker:
+    <<: *reports-worker
+    environment:
+      WAREHOUSE_ID: WH-002
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh002_db:5432/platform
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      wh002_db: {condition: service_healthy}
+      rabbitmq_topology: {condition: service_completed_successfully}
+    networks: [wh002, messaging]
 
   wh002_commands:
     <<: *commands-worker
@@ -201,6 +271,30 @@ services:
     depends_on:
       wh003_db: {condition: service_healthy}
       rabbitmq: {condition: service_started}
+    networks: [wh003, messaging]
+  wh003_cache_invalidation_worker:
+    <<: *cache-invalidation-worker
+    environment:
+      WAREHOUSE_ID: WH-003
+      REDIS_URL: redis://wh003_redis:6379/0
+      CACHE_ENABLED: ${CACHE_ENABLED:-true}
+      CACHE_INVALIDATION: ${CACHE_INVALIDATION:-sync}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      wh003_redis: {condition: service_healthy}
+      rabbitmq_topology: {condition: service_completed_successfully}
+    networks: [wh003, messaging]
+  wh003_reports_worker:
+    <<: *reports-worker
+    environment:
+      WAREHOUSE_ID: WH-003
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh003_db:5432/platform
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      wh003_db: {condition: service_healthy}
+      rabbitmq_topology: {condition: service_completed_successfully}
     networks: [wh003, messaging]
 
   wh003_commands:

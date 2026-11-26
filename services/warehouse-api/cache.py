@@ -77,7 +77,7 @@ def set_inventory(sku: str, data: dict) -> None:
         logger.warning("cache_unavailable", extra={"operation": "set", "sku": sku})
 
 
-def invalidate_inventory(sku: str) -> None:
+def invalidate_inventory(sku: str, *, raise_on_error: bool = False) -> None:
     """Borra la llave. Se llama DESPUÉS del commit; nunca lanza."""
     if not enabled():
         return
@@ -86,3 +86,5 @@ def invalidate_inventory(sku: str) -> None:
     except redis.RedisError:
         # El TTL de 30 s acota cuánto puede durar un dato viejo.
         logger.warning("cache_unavailable", extra={"operation": "delete", "sku": sku})
+        if raise_on_error:
+            raise

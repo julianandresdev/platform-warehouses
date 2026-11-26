@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 from models import MANUAL_MOVEMENT_TYPES, MovementType
 
@@ -87,3 +87,14 @@ class MovementResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ReportRequest(BaseModel):
+    start_at: AwareDatetime
+    end_at: AwareDatetime
+
+    @model_validator(mode="after")
+    def end_must_follow_start(self):
+        if self.end_at <= self.start_at:
+            raise ValueError("end_at debe ser posterior a start_at")
+        return self
