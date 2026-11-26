@@ -27,6 +27,14 @@ x-outbox-worker: &outbox-worker
     LOG_LEVEL: ${LOG_LEVEL:-INFO}
   restart: unless-stopped
 
+# Worker de comandos de la Saga (F6): consume wh-00X.commands.
+x-commands-worker: &commands-worker
+  build:
+    context: ../../services
+    dockerfile: warehouse-api/Dockerfile
+  command: ["python", "-m", "workers.commands"]
+  restart: unless-stopped
+
 x-db-env: &db-env
   POSTGRES_DB: platform
   POSTGRES_USER: admin
@@ -91,6 +99,20 @@ services:
       rabbitmq: {condition: service_started}
     networks: [wh001, messaging]
 
+  wh001_commands:
+    <<: *commands-worker
+    environment:
+      WAREHOUSE_ID: WH-001
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh001_db:5432/platform
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      REDIS_URL: redis://wh001_redis:6379/0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CHAOS_FAIL_STEP: ${CHAOS_FAIL_STEP:-}
+    depends_on:
+      wh001_db: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+    networks: [wh001, messaging]
+
   wh002_db:
     <<: *db
     environment:
@@ -129,6 +151,20 @@ services:
       rabbitmq: {condition: service_started}
     networks: [wh002, messaging]
 
+  wh002_commands:
+    <<: *commands-worker
+    environment:
+      WAREHOUSE_ID: WH-002
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh002_db:5432/platform
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      REDIS_URL: redis://wh002_redis:6379/0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CHAOS_FAIL_STEP: ${CHAOS_FAIL_STEP:-}
+    depends_on:
+      wh002_db: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+    networks: [wh002, messaging]
+
   wh003_db:
     <<: *db
     environment:
@@ -165,6 +201,20 @@ services:
     depends_on:
       wh003_db: {condition: service_healthy}
       rabbitmq: {condition: service_started}
+    networks: [wh003, messaging]
+
+  wh003_commands:
+    <<: *commands-worker
+    environment:
+      WAREHOUSE_ID: WH-003
+      DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh003_db:5432/platform
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      REDIS_URL: redis://wh003_redis:6379/0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CHAOS_FAIL_STEP: ${CHAOS_FAIL_STEP:-}
+    depends_on:
+      wh003_db: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
     networks: [wh003, messaging]
 
   rabbitmq:

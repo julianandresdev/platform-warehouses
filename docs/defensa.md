@@ -31,4 +31,3 @@ Estado: Pendiente de completar.
 
 
 ## Pregunta final: Escalamiento a 100 bodegas
-

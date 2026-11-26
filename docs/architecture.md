@@ -23,4 +23,3 @@ Estado: Pendiente de completar.
 
 
 ## Decisiones arquitectonicas
-

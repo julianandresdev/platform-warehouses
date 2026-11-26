@@ -22,7 +22,7 @@ El estado indica la disponibilidad del documento en esta rama.
 | [0001](0001-fastapi-como-framework.md) | FastAPI + SQLAlchemy | Julian | 13 nov | Existente |
 | [0002](0002-una-imagen-por-dominio.md) | Una imagen por dominio con varios comandos | Julian | 13 nov | Existente |
 | [0003](0003-schema-sql-como-fuente-de-verdad.md) | schema.sql y migraciones en vez de create_all | Julian | 14 nov | Existente |
-| [0004](0004-control-de-concurrencia-en-movimientos.md) | WAREHOUSE_ID de texto y SKU como identificador global | Julian | 14 nov | Revisar correspondencia |
+| [0004](0004-control-de-concurrencia-en-movimientos.md) | Control de concurrencia en movimientos de inventario | Julian | 14 nov | Existente |
 | [0005](0005-topologia-rabbitmq.md) | Topologia de RabbitMQ | David | 15 nov | Existente |
 | [0006](0006-patron-outbox.md) | Patron Outbox | David | 16 nov | Existente |
 | 0007 | Una base por bodega | Santiago | 17 nov | Pendiente |
@@ -30,7 +30,7 @@ El estado indica la disponibilidad del documento en esta rama.
 | 0009 | Nginx como balanceador y health checks pasivos | Santiago | 18 nov | Pendiente |
 | 0010 | API Key; usuarios y operadores fuera de alcance | Esteban | 18 nov | Pendiente |
 | 0011 | MinIO en local, S3 en AWS | Santiago | 19 nov | Pendiente |
-| 0012 | Read Model, CQRS y heartbeat | Esteban | 20 nov | Pendiente de integracion |
+| [0012](0012-proyeccion-cqrs.md) | Read Model, CQRS y heartbeat | Esteban | 20 nov | Existente |
 | 0013 | Saga orquestada contra coreografia | Esteban | 21 nov | Pendiente de integracion |
 | 0014 | El Batch lee las bodegas por API | Julian | 21 nov | Pendiente |
 | 0015 | Reintentos, DLQ y clasificacion de errores | David | 21 nov | Pendiente |
@@ -38,6 +38,7 @@ El estado indica la disponibilidad del documento en esta rama.
 | 0017 | Lambda fuera de la VPC | Santiago | 23 nov | Pendiente |
 | 0018 | Despliegue en AWS Learner Lab | Santiago | 24 nov | Pendiente |
 | 0019 | MQTT, QoS y deduplicacion IoT | David | 24 nov | Pendiente |
+| [0020](0020-idempotencia-comandos-bodega.md) | Idempotencia de comandos Saga en la bodega | Julian | Fuera del cronograma original | Existente |
 
 ## Observaciones
 
