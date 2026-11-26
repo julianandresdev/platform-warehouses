@@ -30,7 +30,7 @@ que motivan la decision arquitectonica.
 - Ventajas:
 - Desventajas:
 
-## Decision
+## Decisión
 
 Indicar la alternativa seleccionada y justificar
 por que se eligio frente a las demas.

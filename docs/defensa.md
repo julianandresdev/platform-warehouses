@@ -2,7 +2,7 @@
 
 Estado: Borrador consolidado pendiente de revision grupal.
 
-## Indice
+## Índice
 
 - Arquitectura - Preguntas 1 a 5
 - Redis - Preguntas 6 a 10

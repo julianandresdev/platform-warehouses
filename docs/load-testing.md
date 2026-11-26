@@ -2,7 +2,7 @@
 
 Estado: Pendiente de completar.
 
-## Indice
+## Índice
 
 - Escenarios
 - Carga aplicada

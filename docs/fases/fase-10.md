@@ -1,22 +1,18 @@
 # Fase 10 - Fallos, idempotencia y DLQ
 
-Lider: David | Apoyo: Esteban
+Líder: David · Apoyo: Esteban
 
 Estado: Pendiente de documentar.
 
-## Que se construyo
+## Qué se construyó
 
 ## Cierre de la fase
 
 ## Decisiones
 
-| Decision | Elegido | Por que |
+| Decisión | Elegido | Por qué |
 | --- | --- | --- |
-
-## Pruebas realizadas
-
-## Resultados y evidencias
 
 ## Preguntas del profesor
 
-## Pendientes
+## Evidencia

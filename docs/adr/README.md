@@ -13,7 +13,7 @@ documentar nuevas decisiones.
 | [0001](0001-fastapi-como-framework.md) | FastAPI y SQLAlchemy | Julian | Disponible |
 | [0002](0002-una-imagen-por-dominio.md) | Una imagen por dominio | Julian | Disponible |
 | [0003](0003-schema-sql-como-fuente-de-verdad.md) | Schema SQL y migraciones | Julian | Disponible |
-| [0004](0004-control-de-concurrencia-en-movimientos.md) | Control de concurrencia | Julian | Tema original por conciliar |
+| [0004](0004-control-de-concurrencia-en-movimientos.md) | Control de concurrencia | Julian | Disponible |
 | [0005](0005-topologia-rabbitmq.md) | Topologia RabbitMQ | David | Disponible |
 | [0006](0006-patron-outbox.md) | Transactional Outbox | David | Disponible |
 | 0007 | Una base por bodega | Santiago | Pendiente |
@@ -37,8 +37,6 @@ documentar nuevas decisiones.
 
 ## Inconsistencias pendientes
 
-- El ADR-0004 documenta concurrencia, mientras que el
-  plan original asigna la identidad de bodegas y SKU.
 - El ADR-0014 de Batch no confirma el cumplimiento
   del contrato original de lectura mediante APIs.
 - Los ADR-0014 de Batch y 0017 de Lambda contienen
