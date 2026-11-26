@@ -1,0 +1,12 @@
+Caso 3: La proyección espera mensajes mientras el worker está detenido
+Fecha UTC: 2026-11-26T04:42:11Z
+Rama: test/D-06-chaos
+OK: API WH-001 lista
+OK: API central lista
+Movimiento: {"id":12,"sku":"P-001","product_id":1,"warehouse_id":"WH-001","type":"RECEIPT","quantity":1,"reference":"d06-caso-3-20261126T044215Z-2690","created_at":"2026-11-26T04:42:15.622481"}
+OK: evento publicado en outbox
+Versión esperada: 3; mensajes pendientes en central.projection: 1
+OK: el evento espera en la cola de proyección
+OK: worker central recupera el mensaje
+Versión proyectada: 3
+Exit code: 0

@@ -1,0 +1,9 @@
+Caso 1: Redis detenido conserva lectura desde PostgreSQL
+Fecha UTC: 2026-11-26T04:40:46Z
+Rama: test/D-06-chaos
+OK: API WH-001 lista
+OK: API central lista
+HTTP: 200; X-Cache: BYPASS
+{"id":1,"sku":"P-001","product_id":1,"warehouse_id":"WH-001","quantity":100,"reserved_quantity":0,"available_quantity":100,"version":1,"updated_at":"2026-11-26T04:39:18.283980"}OK: la API devuelve 200 y X-Cache: BYPASS con Redis detenido
+OK: Redis recuperado
+Exit code: 0
