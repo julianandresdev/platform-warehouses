@@ -407,4 +407,8 @@ def list_global_inventory(
     }
 
 
+from app.api.transfers import router as transfers_router
+
+protected.include_router(transfers_router)
+
 app.include_router(protected)

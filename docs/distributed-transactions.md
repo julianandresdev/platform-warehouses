@@ -7,6 +7,27 @@ su paso en una transacción local y responde con un evento. La parte central est
 en [ADR-0013](adr/0013-saga-orquestada.md) (E-06); este documento cubre el lado de
 la bodega (J-07). El contrato de mensajes está en [events.md](events.md).
 
+## Estados de la transferencia
+
+```mermaid
+stateDiagram-v2
+    [*] --> REQUESTED
+    REQUESTED --> RESERVING_SOURCE: RESERVE_STOCK
+    RESERVING_SOURCE --> FAILED: rechazo o vencimiento
+    RESERVING_SOURCE --> SOURCE_RESERVED: STOCK_RESERVED
+    SOURCE_RESERVED --> IN_TRANSIT: TRANSFER_SHIPPED
+    IN_TRANSIT --> DESTINATION_PENDING: RECEIVE_TRANSFER
+    DESTINATION_PENDING --> DESTINATION_RECEIVED: TRANSFER_RECEIVED
+    DESTINATION_RECEIVED --> COMPLETED
+    SOURCE_RESERVED --> COMPENSATING: TRANSFER_SHIP_FAILED
+    DESTINATION_PENDING --> COMPENSATING: TRANSFER_RECEIVE_FAILED
+    COMPENSATING --> CANCELLED: RESERVATION_RELEASED o STOCK_RETURNED
+```
+
+El vencimiento de la reserva lleva a `FAILED`. Si la confirmación
+llega después, se emite `RELEASE_RESERVATION`. Un destino sin
+respuesta permanece en `DESTINATION_PENDING`. Ver [pruebas de F6](fases/fase-6.md).
+
 ## Bodega
 
 ### Componentes
@@ -67,9 +88,10 @@ Las decisiones y alternativas están en
 - `SHIP_TRANSFER` sin reserva activa (nunca existió, ya se liberó o el SKU no existe):
   no mueve inventario y responde `TRANSFER_SHIP_FAILED` con `reason`
   `NO_ACTIVE_RESERVATION` o `SKU_NOT_FOUND`, para que la central compense en vez de
-  quedarse esperando en `SOURCE_RESERVED`. Es la respuesta al punto que E-06 lista
-  como "tratamiento del fallo definitivo de envío"; la central debe consumir el
-  evento (ver `docs/events.md`).
+  quedarse esperando en `SOURCE_RESERVED`. E-06 consume el evento,
+  pasa a `COMPENSATING` y solicita `RELEASE_RESERVATION`.
+  Tras `RESERVATION_RELEASED` termina en `CANCELLED`.
+  La integración fue validada con un fallo inducido de envío.
 - `RESERVE_STOCK` y el deadline: la hora se toma después de bloquear la fila de
   inventario. Si el comando esperó el `FOR UPDATE` detrás de otra transacción, esa
   espera cuenta contra el deadline.

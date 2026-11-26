@@ -1,4 +1,162 @@
-# Fase 6 — Transferencias con Saga
+# Fase 6 — Transferencias distribuidas mediante Saga
+
+
+## E-06: Orquestador central de Saga
+
+### Objetivo
+
+Coordinar transferencias de inventario entre bodegas
+independientes mediante una Saga orquestada desde
+la plataforma central, sin utilizar una transaccion
+distribuida global.
+
+### Componentes implementados
+
+- Maquina de estados de transferencias.
+- Persistencia de transferencias e historial en PostgreSQL.
+- Central API para solicitar y consultar transferencias.
+- Outbox Relay para publicar comandos y eventos.
+- Orquestador consumidor de eventos RabbitMQ.
+- Temporizador para detectar transferencias vencidas.
+- Control de idempotencia mediante processed_messages.
+- Logs estructurados y propagacion de correlation ID.
+
+### Endpoints
+
+- POST /transfers
+- GET /transfers/{transfer_id}
+
+La creacion de transferencias utiliza Idempotency-Key
+para evitar solicitudes duplicadas.
+
+### Flujo exitoso
+
+REQUESTED -> RESERVING_SOURCE -> SOURCE_RESERVED
+-> IN_TRANSIT -> DESTINATION_PENDING
+-> DESTINATION_RECEIVED -> COMPLETED.
+
+```mermaid
+stateDiagram-v2
+    [*] --> REQUESTED
+    REQUESTED --> RESERVING_SOURCE: RESERVE_STOCK
+    RESERVING_SOURCE --> FAILED: rechazo o vencimiento
+    RESERVING_SOURCE --> SOURCE_RESERVED: STOCK_RESERVED
+    SOURCE_RESERVED --> IN_TRANSIT: TRANSFER_SHIPPED
+    IN_TRANSIT --> DESTINATION_PENDING: RECEIVE_TRANSFER
+    DESTINATION_PENDING --> DESTINATION_RECEIVED: TRANSFER_RECEIVED
+    DESTINATION_RECEIVED --> COMPLETED
+    SOURCE_RESERVED --> COMPENSATING: TRANSFER_SHIP_FAILED
+    DESTINATION_PENDING --> COMPENSATING: TRANSFER_RECEIVE_FAILED
+    COMPENSATING --> CANCELLED: RESERVATION_RELEASED o STOCK_RETURNED
+```
+
+### Manejo de fallos
+
+- Reserva rechazada: estado FAILED.
+- Envio rechazado: TRANSFER_SHIP_FAILED lleva a
+  COMPENSATING, se ordena RELEASE_RESERVATION y se
+  alcanza CANCELLED al recibir RESERVATION_RELEASED.
+- Recepcion rechazada: estado COMPENSATING, seguido
+  de CANCELLED tras confirmar RETURN_STOCK.
+- Reserva sin respuesta durante 30 segundos: FAILED.
+- Reserva confirmada fuera del plazo:
+  comando RELEASE_RESERVATION.
+- Destino sin respuesta durante cinco minutos:
+  alerta en logs sin cancelar la transferencia.
+- Reinicio del orquestador: recuperacion mediante
+  PostgreSQL y mensajes pendientes en RabbitMQ.
+
+### Garantias de consistencia
+
+- Persistencia atomica de estados, historial y Outbox.
+- Bloqueo de filas para controlar modificaciones concurrentes.
+- Deduplicacion de eventos mediante event_id y consumer.
+- Rechazo de transiciones incompatibles.
+- Publicacion asincrona de comandos.
+- Conservacion del estado ante reinicios.
+
+### Pruebas realizadas
+
+| Escenario | Resultado |
+| --- | --- |
+| Creacion y consulta de transferencias | Exitoso |
+| Idempotencia de solicitudes HTTP | Exitoso |
+| Publicacion mediante Outbox | Exitoso |
+| Transferencia exitosa simulada | Exitoso |
+| Eventos duplicados | Exitoso |
+| Eventos incompatibles | Exitoso |
+| Reserva rechazada | Exitoso |
+| Recepcion rechazada y compensacion | Exitoso |
+| Timeout real de reserva | Exitoso |
+| Reserva tardia y liberacion | Exitoso |
+| Recuperacion tras reiniciar el worker | Exitoso |
+| Destino no disponible simulado | Exitoso |
+| Alerta de cinco minutos con fecha simulada | Exitoso |
+| Pruebas unitarias pytest | 46/46 |
+| Transferencia real entre bodegas | Exitoso |
+| Rechazo real por stock insuficiente | Exitoso |
+| Idempotencia HTTP real | Exitoso |
+| Compensacion real por rechazo del destino | Exitoso |
+| Compensacion por fallo de envio inducido | Exitoso |
+
+### Cobertura de los seis experimentos del plan
+
+El [registro de integración](../evidencias/fase-6/e06-integracion.md)
+documenta el caso 100/20 → 70/50. En las corridas operativas se usó
+un SKU de prueba con 175 unidades entre las tres bodegas. El
+[registro operativo](../evidencias/fase-6/e06-experimentos-operativos.json)
+conserva el historial de la API y las lecturas de PostgreSQL.
+Cada lectura registra cantidad, reserva y versión, en ese orden.
+
+| Experimento del plan | Resultado observado |
+| --- | --- |
+| Origen detenido antes de reservar | Se detuvo su consumidor de comandos. La transferencia terminó en `FAILED` por vencimiento y el inventario quedó intacto al restaurar el consumidor. |
+| Fallo después de reservar | La [corrida de integración](../evidencias/fase-6/e06-integracion.md#5-fallo-definitivo-de-envío) indujo un rechazo definitivo al liberar anticipadamente la reserva. Se observó `TRANSFER_SHIP_FAILED`, compensación y `CANCELLED`, con 175 unidades y cero reservas. |
+| Destino temporalmente caído | Con su consumidor detenido, quedó en `DESTINATION_PENDING` y 3 unidades estaban en tránsito. Tras restaurarlo, terminó en `COMPLETED` y se recuperó el total de 175 unidades en las bases de bodega. |
+| Comando RabbitMQ duplicado | Se republicó el mismo `SHIP_TRANSFER` con el mismo identificador. El worker registró el duplicado. Cantidades, reservas y versiones permanecieron iguales. |
+| Timeout con confirmación tardía | Se detuvo el publicador del outbox de origen. La reserva se confirmó localmente antes del plazo y llegó a central después de `FAILED`. Se publicó `RELEASE_RESERVATION` y el stock disponible volvió a su valor inicial. |
+| Reinicio del orquestador | Se reinició el worker con la transferencia en `DESTINATION_PENDING`. El historial persistió y, al restaurar el consumidor de destino, la Saga terminó en `COMPLETED` con 175 unidades. |
+
+Se probó también `CHAOS_FAIL_STEP=SHIP_TRANSFER:before_commit` en un
+consumidor temporal. El envío se revirtió y se reencoló. La Saga
+permaneció en `SOURCE_RESERVED`, con dos unidades reservadas y
+175 en inventario. Al restaurar el consumidor normal, el mismo
+envío se procesó y la Saga terminó en `COMPLETED`, con 175 unidades
+y cero reservas. Esta inyección reproduce un fallo recuperable.
+El rechazo definitivo del registro anterior prueba la ruta de
+compensación a `CANCELLED` por separado.
+
+### Limitaciones y pendientes
+
+Las pruebas funcionales utilizaron bodegas simuladas,
+PostgreSQL y RabbitMQ reales en Docker.
+
+La alerta de destino pendiente se verifico modificando
+la antiguedad de una transferencia de prueba.
+
+La deduplicacion de alertas se mantiene en memoria
+durante cada ejecucion del worker. Un reinicio puede
+generar nuevamente una alerta para una transferencia
+que siga pendiente.
+
+La integracion con J-07 fue validada localmente con tres
+bodegas, PostgreSQL, Redis y RabbitMQ reales en Docker.
+
+Se verificaron cinco escenarios de integracion, incluyendo
+la conservacion del inventario y las dos compensaciones.
+
+El fallo de envio se indujo liberando anticipadamente
+una reserva mediante el handler real de la bodega.
+
+Evidencias: [integracion E-06](../evidencias/fase-6/e06-integracion.md).
+
+La aprobacion y fusion del PR #56 siguen pendientes.
+
+### Decision arquitectonica
+
+Consultar ADR-0013: Saga orquestada desde la central.
+
+---
 
 ## J-07 — Lado bodega: consumidor de comandos
 
@@ -52,7 +210,8 @@ solo vuelve a emitir la respuesta (ADR-0020).
 
 ### Pendiente
 
-- La central (E-06, #56) debe consumir `TRANSFER_SHIP_FAILED` (nuevo en `docs/events.md`)
-  y pasar de `SOURCE_RESERVED` a compensación. La bodega ya lo emite para
-  `SHIP_TRANSFER` sin reserva activa; falta acordar el nombre y la transición con Esteban.
+- Resuelto en E-06: la central consume `TRANSFER_SHIP_FAILED`,
+  pasa de `SOURCE_RESERVED` a `COMPENSATING` y solicita
+  `RELEASE_RESERVATION`. La confirmación lleva a `CANCELLED`.
+  Validado mediante integración real con fallo inducido.
 - Reintentos con límite y DLQ para comandos inválidos o con error: D-05.

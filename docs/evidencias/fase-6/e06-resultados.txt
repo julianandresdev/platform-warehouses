@@ -1,0 +1,366 @@
+========== PRUEBAS UNITARIAS ==========
+..............................................                           [100%]
+46 passed in 0.89s
+========== TRANSFERENCIA 1f1b77e7-12be-4c04-91db-b2427ef833ff ==========
+{
+    "source_warehouse_id": "WH-001",
+    "destination_warehouse_id": "WH-002",
+    "sku": "P-001",
+    "quantity": 30,
+    "status": "COMPLETED",
+    "reason": null,
+    "deadline": "2026-11-26T01:52:40.622797+00:00",
+    "created_at": "2026-11-26T01:52:10.622797+00:00",
+    "updated_at": "2026-11-26T01:52:15.337175+00:00",
+    "completed_at": "2026-11-26T01:52:15.337175+00:00",
+    "transfer_id": "1f1b77e7-12be-4c04-91db-b2427ef833ff",
+    "history": [
+        {
+            "previous_status": null,
+            "new_status": "REQUESTED",
+            "reason": null,
+            "correlation_id": "COR-20261126-7e95607b",
+            "created_at": "2026-11-26T01:52:10.622797+00:00"
+        },
+        {
+            "previous_status": "REQUESTED",
+            "new_status": "RESERVING_SOURCE",
+            "reason": null,
+            "correlation_id": "COR-20261126-7e95607b",
+            "created_at": "2026-11-26T01:52:10.622797+00:00"
+        },
+        {
+            "previous_status": "RESERVING_SOURCE",
+            "new_status": "SOURCE_RESERVED",
+            "reason": null,
+            "correlation_id": "COR-20261126-7e95607b",
+            "created_at": "2026-11-26T01:52:12.837983+00:00"
+        },
+        {
+            "previous_status": "SOURCE_RESERVED",
+            "new_status": "IN_TRANSIT",
+            "reason": null,
+            "correlation_id": "COR-20261126-7e95607b",
+            "created_at": "2026-11-26T01:52:13.429154+00:00"
+        },
+        {
+            "previous_status": "IN_TRANSIT",
+            "new_status": "DESTINATION_PENDING",
+            "reason": null,
+            "correlation_id": "COR-20261126-7e95607b",
+            "created_at": "2026-11-26T01:52:13.429154+00:00"
+        },
+        {
+            "previous_status": "DESTINATION_PENDING",
+            "new_status": "DESTINATION_RECEIVED",
+            "reason": null,
+            "correlation_id": "COR-20261126-7e95607b",
+            "created_at": "2026-11-26T01:52:15.337175+00:00"
+        },
+        {
+            "previous_status": "DESTINATION_RECEIVED",
+            "new_status": "COMPLETED",
+            "reason": null,
+            "correlation_id": "COR-20261126-7e95607b",
+            "created_at": "2026-11-26T01:52:15.337175+00:00"
+        }
+    ]
+}
+========== MOVIMIENTOS wh001_db ==========
+     type     | quantity |                   reference
+--------------+----------+-----------------------------------------------
+ RESERVATION  |       30 | transfer:1f1b77e7-12be-4c04-91db-b2427ef833ff
+ TRANSFER_OUT |       30 | transfer:1f1b77e7-12be-4c04-91db-b2427ef833ff
+(2 rows)
+
+========== MOVIMIENTOS wh002_db ==========
+    type     | quantity |                   reference
+-------------+----------+-----------------------------------------------
+ TRANSFER_IN |       30 | transfer:1f1b77e7-12be-4c04-91db-b2427ef833ff
+(1 row)
+
+========== MOVIMIENTOS wh003_db ==========
+ type | quantity | reference
+------+----------+-----------
+(0 rows)
+
+========== LOGS SAGA ==========
+central-worker-1  | {"timestamp": "2026-11-26T01:52:12.875Z", "service": "central-worker", "warehouse_id": null, "level": "INFO", "event": "saga_transition_completed", "correlation_id": "COR-20261126-7e95607b", "transfer_id": "1f1b77e7-12be-4c04-91db-b2427ef833ff", "event_type": "STOCK_RESERVED", "status": "SOURCE_RESERVED"}
+central-worker-1  | {"timestamp": "2026-11-26T01:52:13.465Z", "service": "central-worker", "warehouse_id": null, "level": "INFO", "event": "saga_transition_completed", "correlation_id": "COR-20261126-7e95607b", "transfer_id": "1f1b77e7-12be-4c04-91db-b2427ef833ff", "event_type": "TRANSFER_SHIPPED", "status": "DESTINATION_PENDING"}
+central-worker-1  | {"timestamp": "2026-11-26T01:52:15.380Z", "service": "central-worker", "warehouse_id": null, "level": "INFO", "event": "saga_transition_completed", "correlation_id": "COR-20261126-7e95607b", "transfer_id": "1f1b77e7-12be-4c04-91db-b2427ef833ff", "event_type": "TRANSFER_RECEIVED", "status": "COMPLETED"}
+========== LOGS BODEGAS ==========
+wh002_commands-1  | {"timestamp": "2026-11-26T01:52:15.246Z", "service": "warehouse-commands", "warehouse_id": "WH-002", "level": "INFO", "event": "command_processed", "correlation_id": "COR-20261126-7e95607b", "command": "RECEIVE_TRANSFER", "event_id": "d937d663-1e63-4dfb-9443-dcea54bbce68", "transfer_id": "1f1b77e7-12be-4c04-91db-b2427ef833ff", "sku": "P-001", "quantity": 30, "response": "TRANSFER_RECEIVED", "reason": null, "movement_type": "TRANSFER_IN", "note": null}
+wh001_commands-1  | {"timestamp": "2026-11-26T01:52:12.954Z", "service": "warehouse-commands", "warehouse_id": "WH-001", "level": "INFO", "event": "command_processed", "correlation_id": "COR-20261126-7e95607b", "command": "RESERVE_STOCK", "event_id": "8bfff760-fa17-4ed8-b3f9-81a54540b185", "transfer_id": "1f1b77e7-12be-4c04-91db-b2427ef833ff", "sku": "P-001", "quantity": 30, "response": "STOCK_RESERVED", "reason": null, "movement_type": "RESERVATION", "note": null}
+wh001_commands-1  | {"timestamp": "2026-11-26T01:52:13.054Z", "service": "warehouse-commands", "warehouse_id": "WH-001", "level": "INFO", "event": "command_processed", "correlation_id": "COR-20261126-7e95607b", "command": "SHIP_TRANSFER", "event_id": "6ae98d33-a326-46ce-81c1-aa3ca11b4aa8", "transfer_id": "1f1b77e7-12be-4c04-91db-b2427ef833ff", "sku": "P-001", "quantity": 30, "response": "TRANSFER_SHIPPED", "reason": null, "movement_type": "TRANSFER_OUT", "note": null}
+========== TRANSFERENCIA 63b0bd7e-ef84-461d-9328-7d86f2cacff2 ==========
+{
+    "source_warehouse_id": "WH-001",
+    "destination_warehouse_id": "WH-002",
+    "sku": "P-001",
+    "quantity": 1000,
+    "status": "FAILED",
+    "reason": "INSUFFICIENT_STOCK",
+    "deadline": "2026-11-26T01:54:21.005790+00:00",
+    "created_at": "2026-11-26T01:53:51.005790+00:00",
+    "updated_at": "2026-11-26T01:53:51.631950+00:00",
+    "completed_at": "2026-11-26T01:53:51.631950+00:00",
+    "transfer_id": "63b0bd7e-ef84-461d-9328-7d86f2cacff2",
+    "history": [
+        {
+            "previous_status": null,
+            "new_status": "REQUESTED",
+            "reason": null,
+            "correlation_id": "COR-20261126-09b8b113",
+            "created_at": "2026-11-26T01:53:51.005790+00:00"
+        },
+        {
+            "previous_status": "REQUESTED",
+            "new_status": "RESERVING_SOURCE",
+            "reason": null,
+            "correlation_id": "COR-20261126-09b8b113",
+            "created_at": "2026-11-26T01:53:51.005790+00:00"
+        },
+        {
+            "previous_status": "RESERVING_SOURCE",
+            "new_status": "FAILED",
+            "reason": "INSUFFICIENT_STOCK",
+            "correlation_id": "COR-20261126-09b8b113",
+            "created_at": "2026-11-26T01:53:51.631950+00:00"
+        }
+    ]
+}
+========== MOVIMIENTOS wh001_db ==========
+ type | quantity | reference
+------+----------+-----------
+(0 rows)
+
+========== MOVIMIENTOS wh002_db ==========
+ type | quantity | reference
+------+----------+-----------
+(0 rows)
+
+========== MOVIMIENTOS wh003_db ==========
+ type | quantity | reference
+------+----------+-----------
+(0 rows)
+
+========== LOGS SAGA ==========
+central-worker-1  | {"timestamp": "2026-11-26T01:53:51.644Z", "service": "central-worker", "warehouse_id": null, "level": "INFO", "event": "saga_transition_completed", "correlation_id": "COR-20261126-09b8b113", "transfer_id": "63b0bd7e-ef84-461d-9328-7d86f2cacff2", "event_type": "STOCK_RESERVATION_FAILED", "status": "FAILED"}
+========== LOGS BODEGAS ==========
+wh001_commands-1  | {"timestamp": "2026-11-26T01:53:51.538Z", "service": "warehouse-commands", "warehouse_id": "WH-001", "level": "INFO", "event": "command_processed", "correlation_id": "COR-20261126-09b8b113", "command": "RESERVE_STOCK", "event_id": "e439246a-189c-4e08-ba4e-4015dc5ed95b", "transfer_id": "63b0bd7e-ef84-461d-9328-7d86f2cacff2", "sku": "P-001", "quantity": 1000, "response": "STOCK_RESERVATION_FAILED", "reason": "INSUFFICIENT_STOCK", "movement_type": null, "note": null}
+========== TRANSFERENCIA 3e459e51-9caf-44ee-a744-99d5c1437cee ==========
+{
+    "source_warehouse_id": "WH-001",
+    "destination_warehouse_id": "WH-002",
+    "sku": "E06-COMP-bc8c6f21",
+    "quantity": 10,
+    "status": "CANCELLED",
+    "reason": "SKU_NOT_FOUND",
+    "deadline": "2026-11-26T01:56:27.504523+00:00",
+    "created_at": "2026-11-26T01:55:57.504523+00:00",
+    "updated_at": "2026-11-26T01:56:00.986305+00:00",
+    "completed_at": "2026-11-26T01:56:00.986305+00:00",
+    "transfer_id": "3e459e51-9caf-44ee-a744-99d5c1437cee",
+    "history": [
+        {
+            "previous_status": null,
+            "new_status": "REQUESTED",
+            "reason": null,
+            "correlation_id": "COR-20261126-6654fd2f",
+            "created_at": "2026-11-26T01:55:57.504523+00:00"
+        },
+        {
+            "previous_status": "REQUESTED",
+            "new_status": "RESERVING_SOURCE",
+            "reason": null,
+            "correlation_id": "COR-20261126-6654fd2f",
+            "created_at": "2026-11-26T01:55:57.504523+00:00"
+        },
+        {
+            "previous_status": "RESERVING_SOURCE",
+            "new_status": "SOURCE_RESERVED",
+            "reason": null,
+            "correlation_id": "COR-20261126-6654fd2f",
+            "created_at": "2026-11-26T01:55:58.311480+00:00"
+        },
+        {
+            "previous_status": "SOURCE_RESERVED",
+            "new_status": "IN_TRANSIT",
+            "reason": null,
+            "correlation_id": "COR-20261126-6654fd2f",
+            "created_at": "2026-11-26T01:55:58.849017+00:00"
+        },
+        {
+            "previous_status": "IN_TRANSIT",
+            "new_status": "DESTINATION_PENDING",
+            "reason": null,
+            "correlation_id": "COR-20261126-6654fd2f",
+            "created_at": "2026-11-26T01:55:58.849017+00:00"
+        },
+        {
+            "previous_status": "DESTINATION_PENDING",
+            "new_status": "COMPENSATING",
+            "reason": "SKU_NOT_FOUND",
+            "correlation_id": "COR-20261126-6654fd2f",
+            "created_at": "2026-11-26T01:56:00.033711+00:00"
+        },
+        {
+            "previous_status": "COMPENSATING",
+            "new_status": "CANCELLED",
+            "reason": "SKU_NOT_FOUND",
+            "correlation_id": "COR-20261126-6654fd2f",
+            "created_at": "2026-11-26T01:56:00.986305+00:00"
+        }
+    ]
+}
+========== MOVIMIENTOS wh001_db ==========
+      type       | quantity |                   reference
+-----------------+----------+-----------------------------------------------
+ RESERVATION     |       10 | transfer:3e459e51-9caf-44ee-a744-99d5c1437cee
+ TRANSFER_OUT    |       10 | transfer:3e459e51-9caf-44ee-a744-99d5c1437cee
+ TRANSFER_RETURN |       10 | transfer:3e459e51-9caf-44ee-a744-99d5c1437cee
+(3 rows)
+
+========== MOVIMIENTOS wh002_db ==========
+ type | quantity | reference
+------+----------+-----------
+(0 rows)
+
+========== MOVIMIENTOS wh003_db ==========
+ type | quantity | reference
+------+----------+-----------
+(0 rows)
+
+========== LOGS SAGA ==========
+central-worker-1  | {"timestamp": "2026-11-26T01:55:58.330Z", "service": "central-worker", "warehouse_id": null, "level": "INFO", "event": "saga_transition_completed", "correlation_id": "COR-20261126-6654fd2f", "transfer_id": "3e459e51-9caf-44ee-a744-99d5c1437cee", "event_type": "STOCK_RESERVED", "status": "SOURCE_RESERVED"}
+central-worker-1  | {"timestamp": "2026-11-26T01:55:58.941Z", "service": "central-worker", "warehouse_id": null, "level": "INFO", "event": "saga_transition_completed", "correlation_id": "COR-20261126-6654fd2f", "transfer_id": "3e459e51-9caf-44ee-a744-99d5c1437cee", "event_type": "TRANSFER_SHIPPED", "status": "DESTINATION_PENDING"}
+central-worker-1  | {"timestamp": "2026-11-26T01:56:00.049Z", "service": "central-worker", "warehouse_id": null, "level": "INFO", "event": "saga_transition_completed", "correlation_id": "COR-20261126-6654fd2f", "transfer_id": "3e459e51-9caf-44ee-a744-99d5c1437cee", "event_type": "TRANSFER_RECEIVE_FAILED", "status": "COMPENSATING"}
+central-worker-1  | {"timestamp": "2026-11-26T01:56:01.035Z", "service": "central-worker", "warehouse_id": null, "level": "INFO", "event": "saga_transition_completed", "correlation_id": "COR-20261126-6654fd2f", "transfer_id": "3e459e51-9caf-44ee-a744-99d5c1437cee", "event_type": "STOCK_RETURNED", "status": "CANCELLED"}
+========== LOGS BODEGAS ==========
+wh002_commands-1  | {"timestamp": "2026-11-26T01:55:59.668Z", "service": "warehouse-commands", "warehouse_id": "WH-002", "level": "INFO", "event": "command_processed", "correlation_id": "COR-20261126-6654fd2f", "command": "RECEIVE_TRANSFER", "event_id": "7dae1f0a-fa12-40e6-b131-767e87238598", "transfer_id": "3e459e51-9caf-44ee-a744-99d5c1437cee", "sku": "E06-COMP-bc8c6f21", "quantity": 10, "response": "TRANSFER_RECEIVE_FAILED", "reason": "SKU_NOT_FOUND", "movement_type": null, "note": null}
+wh001_commands-1  | {"timestamp": "2026-11-26T01:55:57.990Z", "service": "warehouse-commands", "warehouse_id": "WH-001", "level": "INFO", "event": "command_processed", "correlation_id": "COR-20261126-6654fd2f", "command": "RESERVE_STOCK", "event_id": "58775728-594a-4737-a242-a580bed98fc7", "transfer_id": "3e459e51-9caf-44ee-a744-99d5c1437cee", "sku": "E06-COMP-bc8c6f21", "quantity": 10, "response": "STOCK_RESERVED", "reason": null, "movement_type": "RESERVATION", "note": null}
+wh001_commands-1  | {"timestamp": "2026-11-26T01:55:58.413Z", "service": "warehouse-commands", "warehouse_id": "WH-001", "level": "INFO", "event": "command_processed", "correlation_id": "COR-20261126-6654fd2f", "command": "SHIP_TRANSFER", "event_id": "3a919c1e-8db3-44cb-80cc-524e0385c59d", "transfer_id": "3e459e51-9caf-44ee-a744-99d5c1437cee", "sku": "E06-COMP-bc8c6f21", "quantity": 10, "response": "TRANSFER_SHIPPED", "reason": null, "movement_type": "TRANSFER_OUT", "note": null}
+wh001_commands-1  | {"timestamp": "2026-11-26T01:56:00.516Z", "service": "warehouse-commands", "warehouse_id": "WH-001", "level": "INFO", "event": "command_processed", "correlation_id": "COR-20261126-6654fd2f", "command": "RETURN_STOCK", "event_id": "c5863420-ca15-480a-89b7-c580ec55adb9", "transfer_id": "3e459e51-9caf-44ee-a744-99d5c1437cee", "sku": "E06-COMP-bc8c6f21", "quantity": 10, "response": "STOCK_RETURNED", "reason": null, "movement_type": "TRANSFER_RETURN", "note": null}
+========== TRANSFERENCIA 154cd6a9-eb93-4a90-a4c4-553ccdda0231 ==========
+{
+    "source_warehouse_id": "WH-001",
+    "destination_warehouse_id": "WH-002",
+    "sku": "P-001",
+    "quantity": 5,
+    "status": "CANCELLED",
+    "reason": "NO_ACTIVE_RESERVATION",
+    "deadline": "2026-11-26T01:58:12.057507+00:00",
+    "created_at": "2026-11-26T01:57:42.057507+00:00",
+    "updated_at": "2026-11-26T01:57:53.691256+00:00",
+    "completed_at": "2026-11-26T01:57:53.691256+00:00",
+    "transfer_id": "154cd6a9-eb93-4a90-a4c4-553ccdda0231",
+    "history": [
+        {
+            "previous_status": null,
+            "new_status": "REQUESTED",
+            "reason": null,
+            "correlation_id": "COR-20261126-8bc7a4c7",
+            "created_at": "2026-11-26T01:57:42.057507+00:00"
+        },
+        {
+            "previous_status": "REQUESTED",
+            "new_status": "RESERVING_SOURCE",
+            "reason": null,
+            "correlation_id": "COR-20261126-8bc7a4c7",
+            "created_at": "2026-11-26T01:57:42.057507+00:00"
+        },
+        {
+            "previous_status": "RESERVING_SOURCE",
+            "new_status": "SOURCE_RESERVED",
+            "reason": null,
+            "correlation_id": "COR-20261126-8bc7a4c7",
+            "created_at": "2026-11-26T01:57:47.053114+00:00"
+        },
+        {
+            "previous_status": "SOURCE_RESERVED",
+            "new_status": "COMPENSATING",
+            "reason": "NO_ACTIVE_RESERVATION",
+            "correlation_id": "COR-20261126-8bc7a4c7",
+            "created_at": "2026-11-26T01:57:53.167695+00:00"
+        },
+        {
+            "previous_status": "COMPENSATING",
+            "new_status": "CANCELLED",
+            "reason": "NO_ACTIVE_RESERVATION",
+            "correlation_id": "COR-20261126-8bc7a4c7",
+            "created_at": "2026-11-26T01:57:53.691256+00:00"
+        }
+    ]
+}
+========== MOVIMIENTOS wh001_db ==========
+        type         | quantity |                   reference
+---------------------+----------+-----------------------------------------------
+ RESERVATION         |        5 | transfer:154cd6a9-eb93-4a90-a4c4-553ccdda0231
+ RESERVATION_RELEASE |        5 | transfer:154cd6a9-eb93-4a90-a4c4-553ccdda0231
+(2 rows)
+
+========== MOVIMIENTOS wh002_db ==========
+ type | quantity | reference
+------+----------+-----------
+(0 rows)
+
+========== MOVIMIENTOS wh003_db ==========
+ type | quantity | reference
+------+----------+-----------
+(0 rows)
+
+========== LOGS SAGA ==========
+central-worker-1  | {"timestamp": "2026-11-26T01:57:47.091Z", "service": "central-worker", "warehouse_id": null, "level": "INFO", "event": "saga_transition_completed", "correlation_id": "COR-20261126-8bc7a4c7", "transfer_id": "154cd6a9-eb93-4a90-a4c4-553ccdda0231", "event_type": "STOCK_RESERVED", "status": "SOURCE_RESERVED"}
+central-worker-1  | {"timestamp": "2026-11-26T01:57:47.116Z", "service": "central-worker", "warehouse_id": null, "level": "WARNING", "event": "saga_unexpected_compensation", "correlation_id": "COR-20261126-8bc7a4c7", "transfer_id": "154cd6a9-eb93-4a90-a4c4-553ccdda0231"}
+central-worker-1  | {"timestamp": "2026-11-26T01:57:53.194Z", "service": "central-worker", "warehouse_id": null, "level": "INFO", "event": "saga_transition_completed", "correlation_id": "COR-20261126-8bc7a4c7", "transfer_id": "154cd6a9-eb93-4a90-a4c4-553ccdda0231", "event_type": "TRANSFER_SHIP_FAILED", "status": "COMPENSATING"}
+central-worker-1  | {"timestamp": "2026-11-26T01:57:53.707Z", "service": "central-worker", "warehouse_id": null, "level": "INFO", "event": "saga_transition_completed", "correlation_id": "COR-20261126-8bc7a4c7", "transfer_id": "154cd6a9-eb93-4a90-a4c4-553ccdda0231", "event_type": "RESERVATION_RELEASED", "status": "CANCELLED"}
+========== LOGS BODEGAS ==========
+wh001_commands-1  | {"timestamp": "2026-11-26T01:57:53.019Z", "service": "warehouse-commands", "warehouse_id": "WH-001", "level": "INFO", "event": "command_processed", "correlation_id": "COR-20261126-8bc7a4c7", "command": "SHIP_TRANSFER", "event_id": "91b05ac8-ae01-41cd-857f-ba0884be4d23", "transfer_id": "154cd6a9-eb93-4a90-a4c4-553ccdda0231", "sku": "P-001", "quantity": 5, "response": "TRANSFER_SHIP_FAILED", "reason": "NO_ACTIVE_RESERVATION", "movement_type": null, "note": "sin reserva activa"}
+wh001_commands-1  | {"timestamp": "2026-11-26T01:57:53.255Z", "service": "warehouse-commands", "warehouse_id": "WH-001", "level": "INFO", "event": "command_processed", "correlation_id": "COR-20261126-8bc7a4c7", "command": "RELEASE_RESERVATION", "event_id": "0bf7874d-59fa-46bb-bf59-f045afa871a8", "transfer_id": "154cd6a9-eb93-4a90-a4c4-553ccdda0231", "sku": "P-001", "quantity": 5, "response": "RESERVATION_RELEASED", "reason": null, "movement_type": null, "note": "sin reserva activa: nada que liberar"}
+========== INVENTARIO FINAL P-001 ==========
+  sku  | warehouse_id | quantity | reserved_quantity | version
+-------+--------------+----------+-------------------+---------
+ P-001 | WH-001       |       70 |                 0 |       5
+(1 row)
+
+  sku  | warehouse_id | quantity | reserved_quantity | version
+-------+--------------+----------+-------------------+---------
+ P-001 | WH-002       |       50 |                 0 |       2
+(1 row)
+
+  sku  | warehouse_id | quantity | reserved_quantity | version
+-------+--------------+----------+-------------------+---------
+ P-001 | WH-003       |       55 |                 0 |       1
+(1 row)
+
+========== TRANSFERENCIAS REGISTRADAS ==========
+  status   | count
+-----------+-------
+ FAILED    |     1
+ COMPLETED |     1
+ CANCELLED |     2
+(3 rows)
+
+========== CONTENEDORES ==========
+NAME                           IMAGE                             COMMAND                  SERVICE             CREATED          STATUS                      PORTS
+e06-saga-central-api-1         e06-saga-central-api              "uvicorn app.api.mai…"   central-api         12 minutes ago   Up 12 minutes               127.0.0.1:8004->8000/tcp
+e06-saga-central-db-1          postgres:16                       "docker-entrypoint.s…"   central-db          20 minutes ago   Up 20 minutes (healthy)     5432/tcp
+e06-saga-central-worker-1      e06-saga-central-worker           "python -m app.worke…"   central-worker      12 minutes ago   Up 12 minutes               8000/tcp
+e06-saga-nginx-1               nginx:1.27.5-alpine               "/docker-entrypoint.…"   nginx               12 minutes ago   Up 12 minutes               127.0.0.1:8080->80/tcp
+e06-saga-rabbitmq-1            rabbitmq:3.13-management-alpine   "docker-entrypoint.s…"   rabbitmq            20 minutes ago   Up 14 minutes (healthy)     127.0.0.1:5672->5672/tcp, 127.0.0.1:15672->15672/tcp
+e06-saga-rabbitmq_topology-1   e06-saga-rabbitmq_topology        "python -m common.to…"   rabbitmq_topology   12 minutes ago   Exited (0) 12 minutes ago
+e06-saga-wh001_api-1           e06-saga-wh001_api                "uvicorn app:app --h…"   wh001_api           12 minutes ago   Up 12 minutes (healthy)     127.0.0.1:8101->8000/tcp
+e06-saga-wh001_commands-1      e06-saga-wh001_commands           "python -m workers.c…"   wh001_commands      12 minutes ago   Up 4 minutes                8000/tcp
+e06-saga-wh001_db-1            postgres:16-alpine                "docker-entrypoint.s…"   wh001_db            20 minutes ago   Up 20 minutes (healthy)     5432/tcp
+e06-saga-wh001_redis-1         redis:7-alpine                    "docker-entrypoint.s…"   wh001_redis         20 minutes ago   Up 20 minutes (healthy)     6379/tcp
+e06-saga-wh001_worker-1        e06-saga-wh001_worker             "python -m workers.o…"   wh001_worker        12 minutes ago   Up 12 minutes               8000/tcp
+e06-saga-wh002_api-1           e06-saga-wh002_api                "uvicorn app:app --h…"   wh002_api           12 minutes ago   Up 12 minutes (healthy)     8000/tcp
+e06-saga-wh002_commands-1      e06-saga-wh002_commands           "python -m workers.c…"   wh002_commands      12 minutes ago   Up 12 minutes               8000/tcp
+e06-saga-wh002_db-1            postgres:16-alpine                "docker-entrypoint.s…"   wh002_db            20 minutes ago   Up 20 minutes (healthy)     5432/tcp
+e06-saga-wh002_redis-1         redis:7-alpine                    "docker-entrypoint.s…"   wh002_redis         20 minutes ago   Up 19 minutes (healthy)     6379/tcp
+e06-saga-wh002_worker-1        e06-saga-wh002_worker             "python -m workers.o…"   wh002_worker        12 minutes ago   Up 12 minutes               8000/tcp
+e06-saga-wh003_api-1           e06-saga-wh003_api                "uvicorn app:app --h…"   wh003_api           12 minutes ago   Up 12 minutes (healthy)     127.0.0.1:8103->8000/tcp
+e06-saga-wh003_commands-1      e06-saga-wh003_commands           "python -m workers.c…"   wh003_commands      12 minutes ago   Up 12 minutes               8000/tcp
+e06-saga-wh003_db-1            postgres:16-alpine                "docker-entrypoint.s…"   wh003_db            20 minutes ago   Up 19 minutes (healthy)     5432/tcp
+e06-saga-wh003_redis-1         redis:7-alpine                    "docker-entrypoint.s…"   wh003_redis         20 minutes ago   Up 20 minutes (healthy)     6379/tcp
+e06-saga-wh003_worker-1        e06-saga-wh003_worker             "python -m workers.o…"   wh003_worker        12 minutes ago   Up 12 minutes               8000/tcp
