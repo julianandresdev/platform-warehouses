@@ -49,6 +49,23 @@ services:
     networks: [central, messaging]
     restart: unless-stopped
 
+  central-audit-worker:
+    build:
+      context: ../../services
+      dockerfile: central/Dockerfile
+    command: ["python", "-m", "app.workers.audit"]
+    environment:
+      DATABASE_URL: "postgresql+psycopg2://central:${CENTRAL_DB_PASSWORD:-central_dev_password}@central-db:5432/central"
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      central-db:
+        condition: service_healthy
+      rabbitmq_topology:
+        condition: service_completed_successfully
+    networks: [central, messaging]
+    restart: unless-stopped
+
   locust-central:
     image: locustio/locust:2.32.5
     profiles: ["load"]

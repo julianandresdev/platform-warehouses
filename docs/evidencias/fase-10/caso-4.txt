@@ -1,0 +1,10 @@
+Caso 4: Un event_id repetido produce un solo efecto de proyección y auditoría
+Fecha UTC: 2026-11-26T04:42:24Z
+Rama: test/D-06-chaos
+OK: API WH-001 lista
+OK: API central lista
+Evento publicado dos veces: 189b7422-2738-4e60-ab89-2a114a16fd56
+OK: un único registro de auditoría
+Efectos únicos: proyección=1, auditoría=1
+OK: la proyección y auditoría deduplican el mismo event_id
+Exit code: 0
