@@ -1,0 +1,23 @@
+name: Fase 12 - IoT
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  iot-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ejecutar smoke IoT
+        run: bash tests/iot/smoke.sh
+      - name: Publicar resumen de smoke
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fase-12-iot-smoke
+          path: docs/evidencias/fase-12/simulacion-smoke.json
+          if-no-files-found: ignore

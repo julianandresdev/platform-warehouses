@@ -1,0 +1,20 @@
+services:
+  rabbitmq:
+    ports: !override
+      - "127.0.0.1:26772:5672"
+      - "127.0.0.1:26773:15672"
+  mosquitto:
+    ports: !override
+      - "127.0.0.1:21883:1883"
+  iot-ingestion:
+    ports: !override
+      - "127.0.0.1:29103:9103"
+  iot-storage-worker:
+    ports: !override
+      - "127.0.0.1:29104:9104"
+  iot-alert-worker:
+    ports: !override
+      - "127.0.0.1:29105:9105"
+  iot-simulator:
+    ports: !override
+      - "127.0.0.1:29102:9102"

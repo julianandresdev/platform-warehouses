@@ -302,8 +302,119 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  # Fase 12 (D-07): sensores MQTT y procesamiento duradero.
+  mosquitto:
+    image: eclipse-mosquitto:2
+    profiles: ["iot"]
+    ports:
+      - "${MQTT_HOST_PORT:-1883}:1883"
+    volumes:
+      - ./services/iot/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_pub -h 127.0.0.1 -t healthcheck -m ok -q 1"]
+      interval: 5s
+      timeout: 4s
+      retries: 10
+
+  iot-db:
+    image: postgres:16
+    profiles: ["iot"]
+    environment:
+      POSTGRES_DB: iot
+      POSTGRES_USER: iot
+      POSTGRES_PASSWORD: ${IOT_DB_PASSWORD:-iot_dev_password}
+    volumes:
+      - iot_pgdata:/var/lib/postgresql/data
+      - ./infrastructure/sql/iot/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iot -d iot"]
+      interval: 5s
+      timeout: 4s
+      retries: 10
+
+  iot-ingestion:
+    build: {context: ./services, dockerfile: iot/Dockerfile}
+    command: ["python", "-m", "app.ingestion"]
+    profiles: ["iot"]
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports: ["127.0.0.1:19103:9103"]
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      rabbitmq-topology:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  iot-storage-worker:
+    build: {context: ./services, dockerfile: iot/Dockerfile}
+    command: ["python", "-m", "app.storage"]
+    profiles: ["iot"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://iot:${IOT_DB_PASSWORD:-iot_dev_password}@iot-db:5432/iot
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports: ["127.0.0.1:19104:9104"]
+    depends_on:
+      iot-db:
+        condition: service_healthy
+      rabbitmq-topology:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  iot-alert-worker:
+    build: {context: ./services, dockerfile: iot/Dockerfile}
+    command: ["python", "-m", "app.alerts"]
+    profiles: ["iot"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://iot:${IOT_DB_PASSWORD:-iot_dev_password}@iot-db:5432/iot
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+      TEMPERATURE_THRESHOLD: ${TEMPERATURE_THRESHOLD:-35}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports: ["127.0.0.1:19105:9105"]
+    depends_on:
+      iot-db:
+        condition: service_healthy
+      rabbitmq-topology:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  iot-simulator:
+    build: {context: ./services, dockerfile: iot/Dockerfile}
+    command: ["python", "-m", "app.simulator"]
+    profiles: ["iot"]
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+      SENSOR_COUNT: ${SENSOR_COUNT:-100}
+      WAREHOUSE_IDS: ${IOT_WAREHOUSE_IDS:-WH-001,WH-002,WH-003,WH-004,WH-005}
+      PUBLISH_INTERVAL_SECONDS: ${PUBLISH_INTERVAL_SECONDS:-2}
+      SIM_DURATION_SECONDS: ${SIM_DURATION_SECONDS:-600}
+      DUP_RATE: ${DUP_RATE:-0.02}
+      REORDER_RATE: ${REORDER_RATE:-0.05}
+      SIMULATED_OUTAGE_START_SECONDS: ${SIMULATED_OUTAGE_START_SECONDS:-60}
+      SIMULATED_OUTAGE_DURATION_SECONDS: ${SIMULATED_OUTAGE_DURATION_SECONDS:-20}
+      SPOOL_PATH: /var/lib/iot-spool/spool.sqlite3
+      SIMULATOR_SUMMARY_PATH: /evidence/simulacion-10min.json
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports: ["127.0.0.1:19102:9102"]
+    volumes:
+      - iot_spool:/var/lib/iot-spool
+      - ./docs/evidencias/fase-12:/evidence
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    restart: "no"
+
 volumes:
   central_pgdata: {}
   pgdata: {}
   rabbitmq_data: {}
   minio_data: {}
+  mosquitto_data: {}
+  iot_pgdata: {}
+  iot_spool: {}
