@@ -109,7 +109,74 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # Pasos de la Saga (F6): consume wh-00X.commands y responde por el outbox.
+  commands-worker:
+    build: {context: ./services, dockerfile: warehouse-api/Dockerfile}
+    command: ["python", "-m", "workers.commands"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://admin:admin@db:5432/platform
+      WAREHOUSE_ID: ${WAREHOUSE_ID:-WH-001}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+      REDIS_URL: redis://redis:6379/0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Solo pruebas: <COMANDO>:before_commit|after_commit (ver workers/commands.py).
+      CHAOS_FAIL_STEP: ${CHAOS_FAIL_STEP:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+
+  central-db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: central
+      POSTGRES_USER: central
+      POSTGRES_PASSWORD: ${CENTRAL_DB_PASSWORD:-central_dev_password}
+    volumes:
+      - central_pgdata:/var/lib/postgresql/data
+      - ./infrastructure/sql/central/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U central -d central"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  central-api:
+    build:
+      context: ./services
+      dockerfile: central/Dockerfile
+    environment:
+      DATABASE_URL: "postgresql+psycopg2://central:${CENTRAL_DB_PASSWORD:-central_dev_password}@central-db:5432/central"
+      API_KEY: ${CENTRAL_API_KEY:-dev-central-key}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8004:8000"
+    depends_on:
+      central-db:
+        condition: service_healthy
+
+
+  central-worker:
+    build:
+      context: ./services
+      dockerfile: central/Dockerfile
+    command: ["python", "-m", "app.workers.main"]
+    environment:
+      DATABASE_URL: "postgresql+psycopg2://central:${CENTRAL_DB_PASSWORD:-central_dev_password}@central-db:5432/central"
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      central-db:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
+  central_pgdata: {}
   pgdata: {}
   rabbitmq_data: {}

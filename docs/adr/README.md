@@ -32,15 +32,13 @@ documentar nuevas decisiones.
 
 ## Decisiones adicionales
 
-- [Idempotencia de comandos Saga en bodega](0014-idempotencia-comandos-bodega.md):
+- [Idempotencia de comandos Saga en bodega](0020-idempotencia-comandos-bodega.md):
   documento de Julian correspondiente a J-07.
 
 ## Inconsistencias pendientes
 
 - El ADR-0004 documenta concurrencia, mientras que el
   plan original asigna la identidad de bodegas y SKU.
-- Existen dos documentos con el identificador 0014.
-  Se conservan ambos hasta acordar su numeracion.
 - El ADR-0014 de Batch no confirma el cumplimiento
   del contrato original de lectura mediante APIs.
 - Los ADR-0014 de Batch y 0017 de Lambda contienen
