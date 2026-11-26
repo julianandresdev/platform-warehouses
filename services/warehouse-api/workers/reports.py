@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session, sessionmaker
 import config
 from common.events import EventEnvelope
 from common.logging import configure_logging
+from common import storage
 from common.rabbit import PermanentError, connect, consume, declare_topology
 from database import SessionLocal
 
@@ -94,6 +95,33 @@ def _report_result(session: Session, parameters: ReportParameters) -> dict[str, 
     }
 
 
+def report_object_key(job_id: UUID) -> str:
+    return f"reports/jobs/{job_id}.json"
+
+
+def store_report(
+    job_id: UUID,
+    result: dict[str, Any],
+    correlation_id: str,
+    *,
+    client: Any = None,
+) -> str:
+    """Escribe el resultado en ``reports/jobs/<job_id>.json`` (J-08, punto 6).
+
+    El objeto lleva el metadato ``correlation-id`` del evento que pidió el
+    reporte. Devuelve la llave. Repetir el mismo trabajo reemplaza el objeto.
+    """
+
+    key = report_object_key(job_id)
+    storage.put_json(
+        key,
+        {"job_id": str(job_id), **result},
+        metadata={"correlation-id": correlation_id},
+        client=client,
+    )
+    return key
+
+
 def process_report_event(
     message: dict,
     session_factory: sessionmaker[Session] = SessionLocal,
@@ -135,6 +163,10 @@ def process_report_event(
             except ValidationError as exc:
                 raise PermanentError(f"Parámetros de reporte inválidos: {exc}") from exc
             result = _report_result(session, parameters)
+            if config.REPORTS_TO_S3:
+                result["object_key"] = store_report(
+                    request.job_id, result, event.correlation_id
+                )
             session.execute(
                 text(
                     """

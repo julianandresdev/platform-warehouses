@@ -156,6 +156,14 @@ services:
       WAREHOUSE_ID: ${WAREHOUSE_ID:-WH-001}
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # J-08 punto 6: con REPORTS_TO_S3=true el resultado también va a
+      # reports/jobs/<job_id>.json en MinIO (profile `storage` levantado).
+      REPORTS_TO_S3: ${REPORTS_TO_S3:-false}
+      S3_ENDPOINT_URL: ${REPORTS_S3_ENDPOINT_URL:-http://minio:9000}
+      S3_BUCKET: ${S3_BUCKET:-warehouse-platform}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
     depends_on:
       db:
         condition: service_healthy
