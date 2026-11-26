@@ -50,5 +50,20 @@ CREATE TABLE inventory_movements (
     CONSTRAINT ck_movements_quantity_not_zero CHECK (quantity <> 0)
 );
 
+CREATE TABLE report_jobs (
+    job_id      UUID PRIMARY KEY,
+    status      VARCHAR(20) NOT NULL,
+    params      JSONB NOT NULL,
+    result      JSONB,
+    error       TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    finished_at TIMESTAMPTZ,
+    CONSTRAINT ck_report_jobs_status
+        CHECK (status IN ('PROCESSING', 'DONE', 'FAILED'))
+);
+
+CREATE INDEX ix_report_jobs_created_at ON report_jobs (created_at DESC);
+
 CREATE INDEX ix_inventory_movements_lookup
     ON inventory_movements (product_id, warehouse_id, created_at DESC);

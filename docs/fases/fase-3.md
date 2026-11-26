@@ -18,10 +18,22 @@ La prueba `tests/integration/test_rabbit.py` publicó y consumió un mensaje rea
 
 La consola de management está disponible en `http://localhost:15672` mientras el contenedor está activo. Las preguntas del profesor de F3 se completarán al integrar D-03 y D-04.
 
-## Avance D-03 — Outbox y heartbeat
+## D-03 — Outbox y heartbeat
 
-En progreso: cada movimiento inserta `INVENTORY_UPDATED` en `outbox` dentro de su transacción. El worker publica filas pendientes con confirmación, reintenta con backoff cuando falla RabbitMQ y emite `WAREHOUSE_HEARTBEAT` cada 30 segundos. La migración está en `infrastructure/sql/warehouse/migrations/001_outbox.sql`; el ADR asociado es [ADR-0006](../adr/0006-patron-outbox.md).
+Cada movimiento inserta `INVENTORY_UPDATED` en `outbox` dentro de su transacción. El worker publica filas pendientes con confirmación, reintenta con backoff cuando falla RabbitMQ y emite `WAREHOUSE_HEARTBEAT` cada 30 segundos. La migración está en `infrastructure/sql/warehouse/migrations/001_outbox.sql`; el ADR asociado es [ADR-0006](../adr/0006-patron-outbox.md).
 
 La prueba `tests/integration/test_outbox_relay.py` publicó un evento desde PostgreSQL a RabbitMQ y confirmó su `published_at`. El conjunto de pruebas unitarias de J-03 y las pruebas de integración RabbitMQ/outbox terminó con **19 pruebas pasadas** en Python 3.12.
 
 Se verificó también la recuperación real en Compose: con RabbitMQ detenido, `POST /inventory/movements` para `P-001` respondió **201** y la fila `INVENTORY_UPDATED` permaneció en el outbox pendiente (`attempts=1`). Después de reiniciar RabbitMQ, el worker la publicó con confirmación y la fila quedó con `published_at` no nulo (`attempts=2`); el outbox quedó sin pendientes. El mismo worker volvió a publicar el heartbeat.
+
+## D-04 — Invalidación asíncrona, auditoría y reportes
+
+- La API invalida Redis sincrónicamente por defecto. Con `CACHE_INVALIDATION=async`, registra el evento en el outbox y omite el `DEL` síncrono; `cache-invalidation-worker` consume `wh-00X.cache-invalidation` y borra la llave. Si Redis no está disponible, el handler falla para que RabbitMQ reencole el mensaje.
+- El worker central consume `central.audit` y escribe el sobre en `audit_events`; `event_id` es la clave primaria y `ON CONFLICT DO NOTHING` hace idempotente la inserción.
+- `POST /reports` acepta un rango UTC (`start_at`, `end_at`), crea `report_jobs` y `REPORT_REQUESTED` en la misma transacción, y responde HTTP 202 con `job_id` y estado `PROCESSING`.
+- El worker de reportes calcula conteos y unidades movidas por tipo, además de los diez SKU más movidos (suma de valores absolutos), y guarda `DONE`/resultado o `FAILED`/error. `GET /reports/jobs/{id}` consulta el estado.
+- Los consumidores reutilizan el `correlation_id` del sobre; el formatter JSON lo incluye en los logs de API y workers.
+
+La tabla `report_jobs` está en `schema.sql` y en la migración `002_report_jobs.sql`. Para un volumen de base ya creado, ejecutar una vez `docker compose exec db psql -U admin -d platform -v ON_ERROR_STOP=1 -f /sql/migrations/002_report_jobs.sql`.
+
+Evidencia automatizada: `tests/integration/fase3/test_d04_warehouse.py` cubre la API/outbox, el procesamiento repetido del reporte, el borrado de Redis y el consumo de un mensaje pendiente; `tests/integration/fase3/central_audit/test_d04_audit.py` verifica la deduplicación de auditoría. El workflow `Fase 3 - Workers` levanta PostgreSQL, Redis y RabbitMQ para estos casos.

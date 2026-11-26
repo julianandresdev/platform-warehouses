@@ -13,8 +13,10 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Integer,
+    JSON,
     String,
     Text,
+    Uuid,
     UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
@@ -127,3 +129,22 @@ class InventoryMovement(Base):
     @property
     def sku(self) -> str:
         return self.product.sku
+
+
+class ReportJob(Base):
+    __tablename__ = "report_jobs"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('PROCESSING', 'DONE', 'FAILED')",
+            name="ck_report_jobs_status",
+        ),
+    )
+
+    job_id = Column(Uuid(as_uuid=True), primary_key=True)
+    status = Column(String(20), nullable=False)
+    params = Column(JSON, nullable=False)
+    result = Column(JSON, nullable=True)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    finished_at = Column(DateTime(timezone=True), nullable=True)

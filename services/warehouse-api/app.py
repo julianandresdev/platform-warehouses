@@ -1,8 +1,10 @@
+import json
 import logging
 import secrets
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime
+from uuid import UUID, uuid4
 
 from fastapi import (
     APIRouter,
@@ -16,6 +18,7 @@ from fastapi import (
 )
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 import cache
@@ -24,6 +27,8 @@ import schemas
 import services
 from common.correlation import CorrelationIdMiddleware
 from common.logging import configure_logging
+from common.events import new_event
+from common.outbox import add_event
 from database import get_db
 
 configure_logging("warehouse-api", config.WAREHOUSE_ID, config.LOG_LEVEL)
@@ -307,6 +312,89 @@ def get_inventory_movements(
     db: Session = Depends(get_db),
 ):
     return services.get_inventory_movements(db, sku)
+
+
+# -------------------------
+# REPORTES ASÍNCRONOS
+# -------------------------
+
+@protected.post("/reports", status_code=status.HTTP_202_ACCEPTED)
+def create_report(
+    request: schemas.ReportRequest,
+    db: Session = Depends(get_db),
+):
+    job_id = uuid4()
+    parameters = request.model_dump(mode="json")
+    event = new_event(
+        event_type="REPORT_REQUESTED",
+        payload={
+            "job_id": str(job_id),
+            "warehouse_id": config.WAREHOUSE_ID,
+            "parameters": parameters,
+        },
+        source=f"warehouse-{config.WAREHOUSE_ID}",
+    )
+
+    try:
+        with db.begin():
+            db.execute(
+                text(
+                    """
+                    INSERT INTO report_jobs (job_id, status, params)
+                    VALUES (CAST(:job_id AS UUID), 'PROCESSING', CAST(:params AS JSONB))
+                    """
+                ),
+                {"job_id": str(job_id), "params": json.dumps(parameters)},
+            )
+            add_event(
+                db,
+                event,
+                exchange="warehouse.events",
+                routing_key=f"warehouse.{config.WAREHOUSE_ID}.report.requested",
+            )
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("report_job_create_failed", extra={"job_id": str(job_id)})
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No se pudo programar el reporte",
+        )
+
+    logger.info(
+        "report_job_created",
+        extra={"job_id": str(job_id), "event_id": str(event.event_id)},
+    )
+    return {"job_id": str(job_id), "status": "PROCESSING"}
+
+
+@protected.get("/reports/jobs/{job_id}")
+def get_report_job(job_id: UUID, db: Session = Depends(get_db)):
+    try:
+        row = db.execute(
+            text(
+                """
+                SELECT job_id, status, params, result, error,
+                       created_at, updated_at, finished_at
+                FROM report_jobs
+                WHERE job_id = CAST(:job_id AS UUID)
+                """
+            ),
+            {"job_id": job_id},
+        ).mappings().first()
+    except SQLAlchemyError:
+        logger.exception("report_job_query_failed", extra={"job_id": str(job_id)})
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No se pudo consultar el reporte",
+        )
+
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Trabajo de reporte no encontrado",
+        )
+
+    return dict(row)
 
 
 app.include_router(protected)

@@ -1,6 +1,6 @@
 # Contrato de eventos y comandos
 
-Versión 1 · 22 de noviembre de 2026 · Responsable: David
+Versión 2 · 25 de noviembre de 2026 · Responsable: David
 
 Este documento fija el contrato de mensajes para los servicios del proyecto. Se deriva del plan de desarrollo adjunto. Describe el contrato objetivo; no implica que todos los productores, consumidores o workers estén implementados todavía. Los cambios posteriores deben actualizar este archivo junto con el código que los usa.
 
@@ -62,7 +62,7 @@ En las tablas, `WH` representa un identificador de bodega como `WH-001`. Las cla
 | --- | --- | --- | --- | --- | --- |
 | `INVENTORY_UPDATED` | Bodega / `warehouse.events` | `warehouse.WH.inventory.updated` | `warehouse_id: string`, `sku: string`, `quantity: integer`, `reserved_quantity: integer`, `version: integer`, `movement_type: string` | Invalidación de caché de la bodega, proyección central, auditoría | La proyección descarta `version` repetida o menor; borrar una clave de caché se puede repetir. Auditoría deduplica por `event_id`. |
 | `WAREHOUSE_HEARTBEAT` | Bodega / `warehouse.events` | `warehouse.WH.heartbeat` | `warehouse_id: string` | Proyección central | Actualizar `last_seen` es repetible; se conserva el timestamp más reciente. |
-| `REPORT_REQUESTED` | Bodega / `warehouse.events` | `warehouse.WH.report.requested` | `job_id: string (UUID)`, `warehouse_id: string`, `parameters: object` | Worker de reportes de esa bodega | El worker debe deduplicar por `event_id` o `job_id`. |
+| `REPORT_REQUESTED` | Bodega / `warehouse.events` | `warehouse.WH.report.requested` | `job_id: string (UUID)`, `warehouse_id: string`, `parameters: {start_at: string ISO 8601 UTC, end_at: string ISO 8601 UTC}` | Worker de reportes de esa bodega | `report_jobs.status` evita recalcular trabajos ya terminados. |
 | `STOCK_RESERVED` | Bodega / `warehouse.events` | `warehouse.WH.transfer.stock_reserved` | `transfer_id: string (UUID)`, `warehouse_id: string`, `sku: string`, `quantity: integer` | Orquestador central, auditoría | Auditoría deduplica por `event_id`; el orquestador registra el mensaje procesado. |
 | `STOCK_RESERVATION_FAILED` | Bodega / `warehouse.events` | `warehouse.WH.transfer.stock_reservation_failed` | `transfer_id: string (UUID)`, `warehouse_id: string`, `sku: string`, `quantity: integer`, `reason: string` | Orquestador central, auditoría | Igual que los demás resultados de transferencia. |
 | `RESERVATION_RELEASED` | Bodega / `warehouse.events` | `warehouse.WH.transfer.reservation_released` | `transfer_id: string (UUID)`, `warehouse_id: string`, `sku: string`, `quantity: integer` | Orquestador central, auditoría | Igual que los demás resultados de transferencia. |
@@ -99,8 +99,8 @@ Todas son durables, tienen `prefetch_count = 10`, ack manual después del commit
 | Cola | Binding | Consumidor |
 | --- | --- | --- |
 | `wh-001.commands` | `warehouse.commands` con routing key `WH-001` | Worker de comandos de WH-001. Una cola equivalente por bodega. |
-| `wh-001.cache-invalidation` | `warehouse.events` con `warehouse.WH-001.inventory.updated` | Worker de invalidación asíncrona de WH-001 (cuando `CACHE_INVALIDATION=async`). |
-| `wh-001.reports` | `warehouse.events` con `warehouse.WH-001.report.requested` | Worker de reportes de WH-001. |
+| `wh-001.cache-invalidation` | `warehouse.events` con `warehouse.WH-001.inventory.updated` | Worker de invalidación asíncrona de WH-001; solo consume cuando `CACHE_INVALIDATION=async`. |
+| `wh-001.reports` | `warehouse.events` con `warehouse.WH-001.report.requested` | Worker de reportes de WH-001; actualiza `report_jobs` a `DONE` o `FAILED`. |
 | `central.projection` | `warehouse.events` con `warehouse.*.inventory.updated` y `warehouse.*.heartbeat` | Worker de proyección del read model. |
 | `central.transfer-orchestrator` | `warehouse.events` con `warehouse.*.transfer.*` | Orquestador central de la Saga. |
 | `central.audit` | `warehouse.events` con `#` y `central.events` con `#` | Worker de auditoría central. |
@@ -115,4 +115,4 @@ Los consumidores no deben asumir orden global entre colas. Para inventario, `ver
 
 ## Estado de aprobación
 
-Contrato redactado desde el plan compartido. Requiere revisión y aprobación del equipo para considerarse congelado. La implementación y las pruebas de topología quedan en D-02 y tareas posteriores.
+El contrato se deriva del plan compartido. D-02 y D-03 implementaron la topología y el outbox; D-04 añade la invalidación asíncrona, auditoría y reportes. Retry/DLQ siguen en D-05.

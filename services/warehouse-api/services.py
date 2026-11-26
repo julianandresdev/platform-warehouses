@@ -309,6 +309,7 @@ def process_inventory_movement(
 
     # Ya hay COMMIT. Invalidar antes dejaría que una lectura concurrente volviera
     # a cachear el valor viejo (ADR-0008).
-    cache.invalidate_inventory(movement.sku)
+    if config.CACHE_INVALIDATION == "sync":
+        cache.invalidate_inventory(movement.sku)
 
     return db_movement
