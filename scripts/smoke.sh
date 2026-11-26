@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pruebas de humo de la plataforma desplegada (S-09). Sale con código 1 si algo falla.
 # Uso: API_KEY=... CENTRAL_API_KEY=... scripts/smoke.sh <ip-o-host>
-#   Con localhost sirve también para el Compose local (puertos 8101, 8102, 8103 y 8004).
+#   Con localhost sirve también para el Compose local: PORT_WH2=8080 (WH-002 va por nginx).
 set -uo pipefail
 
 HOST=${1:?uso: scripts/smoke.sh <ip-o-host>}
@@ -17,7 +17,8 @@ http() { # <método> <url> [cabeceras y cuerpo para curl...]
   curl -s -m 10 -o /tmp/smoke.body -w '%{http_code}' -X "$metodo" "$url" "$@"
 }
 
-for par in WH-001:8101 WH-002:8102 WH-003:8103; do
+PORT_WH2=${PORT_WH2:-8102}   # local: WH-002 se publica por nginx en el 8080
+for par in WH-001:8101 WH-002:$PORT_WH2 WH-003:8103; do
   wh=${par%%:*}; puerto=${par#*:}
   [ "$(http GET "http://$HOST:$puerto/health")" = 200 ] && ok "$wh /health" || falla "$wh /health"
   [ "$(http GET "http://$HOST:$puerto/health/ready")" = 200 ] && ok "$wh /health/ready (base de datos)" || falla "$wh /health/ready"
