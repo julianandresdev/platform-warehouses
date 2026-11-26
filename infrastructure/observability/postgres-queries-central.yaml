@@ -1,0 +1,24 @@
+# Consultas propias de postgres_exporter para la base de la central.
+central_transfers:
+  query: |
+    SELECT status, count(*) AS total FROM transfers GROUP BY status
+  metrics:
+    - status:
+        usage: LABEL
+        description: Estado de la transferencia en la Saga
+    - total:
+        usage: GAUGE
+        description: Transferencias en ese estado
+
+central_outbox:
+  query: |
+    SELECT count(*) FILTER (WHERE published_at IS NULL) AS pending,
+           COALESCE(EXTRACT(EPOCH FROM now() - min(created_at) FILTER (WHERE published_at IS NULL)), 0) AS oldest_seconds
+    FROM outbox
+  metrics:
+    - pending:
+        usage: GAUGE
+        description: Eventos de outbox central sin publicar
+    - oldest_seconds:
+        usage: GAUGE
+        description: Antigüedad en segundos del evento pendiente más viejo

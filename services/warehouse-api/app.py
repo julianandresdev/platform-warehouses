@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 import cache
 import config
+from common.metrics import observe_request
 import schemas
 import services
 from common.correlation import CorrelationIdMiddleware
@@ -52,6 +53,7 @@ app = FastAPI(
 async def log_requests(request, call_next):
     start = time.perf_counter()
     response = await call_next(request)
+    observe_request(request, response.status_code, time.perf_counter() - start)
     logger.info(
         "request",
         extra={

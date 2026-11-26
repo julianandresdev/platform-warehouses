@@ -1,0 +1,74 @@
+# Observabilidad (S-07, ADR-0016). Se suma a las otras dos con el profile `obs`:
+#   docker compose -p warehouses-demo \
+#     -f infrastructure/compose/compose.distributed.yml \
+#     -f infrastructure/compose/compose.central.yml \
+#     -f infrastructure/compose/compose.obs.yml --profile obs up -d --build
+# Prometheus en http://localhost:9090 y Grafana en http://localhost:3000 (admin/admin).
+x-redis-exporter: &redis-exporter
+  image: oliver006/redis_exporter:v1.66.0
+  profiles: ["obs"]
+  restart: unless-stopped
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    profiles: ["obs"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=2d
+    volumes:
+      - ../observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports: ["127.0.0.1:9090:9090"]
+    networks: [wh001, wh002, wh003, central, messaging]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    profiles: ["obs"]
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on: [prometheus]
+    networks: [central]
+    restart: unless-stopped
+
+  wh001_redis_exporter:
+    <<: *redis-exporter
+    environment: {REDIS_ADDR: "redis://wh001_redis:6379"}
+    networks: [wh001, central]
+  wh002_redis_exporter:
+    <<: *redis-exporter
+    environment: {REDIS_ADDR: "redis://wh002_redis:6379"}
+    networks: [wh002, central]
+  wh003_redis_exporter:
+    <<: *redis-exporter
+    environment: {REDIS_ADDR: "redis://wh003_redis:6379"}
+    networks: [wh003, central]
+
+  wh002_postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    profiles: ["obs"]
+    environment:
+      DATA_SOURCE_NAME: postgresql://admin:${DB_PASSWORD:-localdev}@wh002_db:5432/platform?sslmode=disable
+      PG_EXPORTER_EXTEND_QUERY_PATH: /queries.yaml
+    volumes:
+      - ../observability/postgres-queries-warehouse.yaml:/queries.yaml:ro
+    networks: [wh002, central]
+    restart: unless-stopped
+
+  central_postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    profiles: ["obs"]
+    environment:
+      DATA_SOURCE_NAME: postgresql://central:${CENTRAL_DB_PASSWORD:-central_dev_password}@central-db:5432/central?sslmode=disable
+      PG_EXPORTER_EXTEND_QUERY_PATH: /queries.yaml
+    volumes:
+      - ../observability/postgres-queries-central.yaml:/queries.yaml:ro
+    networks: [central]
+    restart: unless-stopped

@@ -1,0 +1,73 @@
+# Prometheus de la plataforma (S-07, ADR-0016). Se levanta con el profile `obs`
+# de infrastructure/compose/compose.obs.yml, en las mismas redes que los servicios.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # APIs de bodega: /metrics con http_requests_total, http_request_duration_seconds
+  # y cache_hits_total / cache_misses_total.
+  - job_name: wh001-api
+    static_configs:
+      - targets: ["wh001_api:8000"]
+        labels: {warehouse: WH-001}
+
+  # WH-002 puede tener varias réplicas (--scale wh002_api=3): el DNS interno de
+  # Docker devuelve una IP por réplica y Prometheus las descubre solo.
+  - job_name: wh002-api
+    dns_sd_configs:
+      - names: ["wh002_api"]
+        type: A
+        port: 8000
+        refresh_interval: 5s
+    relabel_configs:
+      - target_label: warehouse
+        replacement: WH-002
+
+  - job_name: wh003-api
+    static_configs:
+      - targets: ["wh003_api:8000"]
+        labels: {warehouse: WH-003}
+
+  - job_name: central-api
+    static_configs:
+      - targets: ["central-api:8000"]
+
+  # Worker central: projection_lag_seconds en el puerto 9101.
+  - job_name: central-worker
+    static_configs:
+      - targets: ["central-worker:9101"]
+
+  # RabbitMQ: plugin rabbitmq_prometheus (puerto 15692). Las métricas agregadas
+  # salen de /metrics y las de cada cola, de /metrics/detailed.
+  - job_name: rabbitmq
+    static_configs:
+      - targets: ["rabbitmq:15692"]
+  - job_name: rabbitmq-queues
+    metrics_path: /metrics/detailed
+    params:
+      family: [queue_coarse_metrics, queue_consumer_count]
+    static_configs:
+      - targets: ["rabbitmq:15692"]
+
+  - job_name: redis
+    static_configs:
+      - targets: ["wh001_redis_exporter:9121"]
+        labels: {warehouse: WH-001}
+      - targets: ["wh002_redis_exporter:9121"]
+        labels: {warehouse: WH-002}
+      - targets: ["wh003_redis_exporter:9121"]
+        labels: {warehouse: WH-003}
+
+  # postgres_exporter de WH-002 y de la central, con consultas propias
+  # (outbox pendiente, transferencias por estado).
+  - job_name: postgres
+    static_configs:
+      - targets: ["wh002_postgres_exporter:9187"]
+        labels: {warehouse: WH-002}
+      - targets: ["central_postgres_exporter:9187"]
+        labels: {warehouse: central}

@@ -20,6 +20,9 @@ from sqlalchemy.orm import Session
 
 from common.correlation import CorrelationIdMiddleware
 from common.logging import configure_logging
+from common.metrics import observe_request
+from fastapi.responses import Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from fastapi import Request
 from starlette.concurrency import run_in_threadpool
@@ -61,6 +64,7 @@ async def log_requests(request, call_next):
     start = time.perf_counter()
 
     response = await call_next(request)
+    observe_request(request, response.status_code, time.perf_counter() - start)
 
     logger.info(
         "request",
@@ -108,6 +112,11 @@ protected = APIRouter(
 # --------------------------------------------------
 # HEALTH CHECKS
 # --------------------------------------------------
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 
 @app.get("/health")
 def health():

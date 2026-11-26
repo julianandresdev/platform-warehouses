@@ -25,7 +25,7 @@ documentar nuevas decisiones.
 | [0013](0013-saga-orquestada.md) | Saga orquestada | Esteban | Recuperado de E-06 |
 | [0014](0014-batch-lee-bodegas-por-api.md) | El batch lee las bodegas por API | Julian | Disponible (J-08, PR #63) |
 | [0015](0015-reintentos-dlq-idempotencia.md) | Reintentos, DLQ e idempotencia | David | Implementado en D-05; validación local |
-| [0016](0016-prometheus-y-grafana.md) | Prometheus y Grafana | Santiago | Borrador pendiente de revisión |
+| [0016](0016-prometheus-y-grafana.md) | Prometheus y Grafana | Santiago | Disponible (S-07) |
 | [0017](0017-lambda-fuera-de-la-vpc.md) | Lambda fuera de la VPC | Santiago | Disponible (S-08, PR #65) |
 | [0018](0018-despliegue-aws-learner-lab.md) | Despliegue AWS Learner Lab | Santiago | Disponible (S-09) |
 | [0019](0019-mqtt-qos-y-deduplicacion.md) | MQTT, QoS e IoT | David | Borrador pendiente de revisión |
