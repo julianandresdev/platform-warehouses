@@ -1,0 +1,8 @@
+HTTP/1.1 201 Created
+date: Wed, 25 Nov 2026 19:23:11 GMT
+server: uvicorn
+content-length: 174
+content-type: application/json
+x-correlation-id: COR-E07-WORKER-1795634586
+
+{"id":12,"sku":"P-001","product_id":1,"warehouse_id":"WH-001","type":"RECEIPT","quantity":1,"reference":"COR-E07-WORKER-1795634586","created_at":"2026-11-25T19:23:11.854355"}

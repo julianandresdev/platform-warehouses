@@ -1,0 +1,7 @@
+-[ RECORD 1 ]+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+event_id     | 6221277c-4271-4414-95ff-4153afcdcc59
+routing_key  | warehouse.WH-001.inventory.updated
+payload      | {"source": "warehouse-WH-001", "payload": {"sku": "P-001", "version": 2, "quantity": 101, "warehouse_id": "WH-001", "movement_type": "RECEIPT", "reserved_quantity": 0}, "event_id": "6221277c-4271-4414-95ff-4153afcdcc59", "event_type": "INVENTORY_UPDATED", "occurred_at": "2026-11-25T19:21:42Z", "event_version": 1, "correlation_id": "COR-E07-RABBIT-1795634499"}
+created_at   | 2026-11-25 19:21:42.424903+00
+published_at |
+attempts     | 1

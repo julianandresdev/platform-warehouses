@@ -1,0 +1,63 @@
+========== FECHA ==========
+2026-11-25T14:25:15-05:00
+========== INVENTARIO GLOBAL CENTRAL ==========
+ warehouse_id |  sku  | quantity | version |       updated_at
+--------------+-------+----------+---------+------------------------
+ WH-001       | P-001 |      102 |       3 | 2026-11-25 19:23:11+00
+ WH-002       | P-001 |       35 |       3 | 2026-11-25 03:38:28+00
+(2 rows)
+
+========== ESTADO DE LAS BODEGAS ==========
+ warehouse_id |      last_seen_at      |     last_event_at
+--------------+------------------------+------------------------
+ WH-001       | 2026-11-25 19:24:49+00 | 2026-11-25 19:23:11+00
+ WH-002       | 2026-11-25 19:25:12+00 | 2026-11-25 03:38:28+00
+ WH-003       | 2026-11-25 19:25:11+00 |
+(3 rows)
+
+========== OUTBOX DE WH-003 ==========
+ event_id | routing_key | payload | published_at | attempts
+----------+-------------+---------+--------------+----------
+(0 rows)
+
+========== EVENTOS AGRUPADOS WH-003 ==========
+ routing_key | total | publicados
+-------------+-------+------------
+(0 rows)
+
+========== INVENTARIO LOCAL WH-003 ==========
+{"id":1,"sku":"P-001","product_id":1,"warehouse_id":"WH-003","quantity":55,"reserved_quantity":0,"available_quantity":55,"version":1,"updated_at":"2026-11-25T03:24:44.532995"}
+========== LOGS WORKER WH-003 ==========
+{"timestamp": "2026-11-25T19:22:07.937Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "ERROR", "event": "TCP Connection attempt failed: ConnectionRefusedError(111, 'Connection refused'); dest=(<AddressFamily.AF_INET: 2>, <SocketKind.SOCK_STREAM: 1>, 6, '', ('172.26.0.2', 5672))", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:07.937Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "ERROR", "event": "AMQPConnector - reporting failure: AMQPConnectorSocketConnectError: ConnectionRefusedError(111, 'Connection refused') (host='rabbitmq', port=5672)", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:07.937Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "ERROR", "event": "AMQP connection workflow failed: AMQPConnectionWorkflowFailed: 1 exceptions in all; last exception - AMQPConnectorSocketConnectError: ConnectionRefusedError(111, 'Connection refused') (host='rabbitmq', port=5672); first exception - None.", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:07.938Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "ERROR", "event": "AMQPConnectionWorkflow - reporting failure: AMQPConnectionWorkflowFailed: 1 exceptions in all; last exception - AMQPConnectorSocketConnectError: ConnectionRefusedError(111, 'Connection refused') (host='rabbitmq', port=5672); first exception - None", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:07.938Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "ERROR", "event": "Connection workflow failed: AMQPConnectionWorkflowFailed: 1 exceptions in all; last exception - AMQPConnectorSocketConnectError: ConnectionRefusedError(111, 'Connection refused') (host='rabbitmq', port=5672); first exception - None", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:07.938Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "ERROR", "event": "Error in _create_connection().", "correlation_id": null, "exception": "Traceback (most recent call last):\n  File \"/usr/local/lib/python3.12/site-packages/pika/adapters/blocking_connection.py\", line 527, in _create_connection\n    raise self._reap_last_connection_workflow_error(result)\npika.exceptions.AMQPConnectionError"}
+{"timestamp": "2026-11-25T19:22:07.939Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "WARNING", "event": "rabbit_connection_retry", "correlation_id": null, "attempt": 1, "delay_seconds": 0.568}
+{"timestamp": "2026-11-25T19:22:08.510Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "INFO", "event": "Pika version 1.5.0 connecting to ('172.26.0.2', 5672)", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:08.511Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "ERROR", "event": "Socket failed to connect: <socket.socket fd=6, family=2, type=1, proto=6, laddr=('172.26.0.7', 50220)>; error=111 (Connection refused)", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:08.512Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "ERROR", "event": "TCP Connection attempt failed: ConnectionRefusedError(111, 'Connection refused'); dest=(<AddressFamily.AF_INET: 2>, <SocketKind.SOCK_STREAM: 1>, 6, '', ('172.26.0.2', 5672))", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:08.512Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "ERROR", "event": "AMQPConnector - reporting failure: AMQPConnectorSocketConnectError: ConnectionRefusedError(111, 'Connection refused') (host='rabbitmq', port=5672)", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:08.512Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "ERROR", "event": "AMQP connection workflow failed: AMQPConnectionWorkflowFailed: 1 exceptions in all; last exception - AMQPConnectorSocketConnectError: ConnectionRefusedError(111, 'Connection refused') (host='rabbitmq', port=5672); first exception - None.", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:08.512Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "ERROR", "event": "AMQPConnectionWorkflow - reporting failure: AMQPConnectionWorkflowFailed: 1 exceptions in all; last exception - AMQPConnectorSocketConnectError: ConnectionRefusedError(111, 'Connection refused') (host='rabbitmq', port=5672); first exception - None", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:08.512Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "ERROR", "event": "Connection workflow failed: AMQPConnectionWorkflowFailed: 1 exceptions in all; last exception - AMQPConnectorSocketConnectError: ConnectionRefusedError(111, 'Connection refused') (host='rabbitmq', port=5672); first exception - None", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:08.513Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "ERROR", "event": "Error in _create_connection().", "correlation_id": null, "exception": "Traceback (most recent call last):\n  File \"/usr/local/lib/python3.12/site-packages/pika/adapters/blocking_connection.py\", line 527, in _create_connection\n    raise self._reap_last_connection_workflow_error(result)\npika.exceptions.AMQPConnectionError"}
+{"timestamp": "2026-11-25T19:22:08.513Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "WARNING", "event": "rabbit_connection_retry", "correlation_id": null, "attempt": 2, "delay_seconds": 1.199}
+{"timestamp": "2026-11-25T19:22:09.716Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "INFO", "event": "Pika version 1.5.0 connecting to ('172.26.0.2', 5672)", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:09.717Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "INFO", "event": "Socket connected: <socket.socket fd=6, family=2, type=1, proto=6, laddr=('172.26.0.7', 50222), raddr=('172.26.0.2', 5672)>", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:09.721Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "INFO", "event": "Streaming transport linked up: (<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7d4b551388c0>, _StreamingProtocolShim: <SelectConnection PROTOCOL transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7d4b551388c0> params=<URLParameters host=rabbitmq port=5672 virtual_host=/ ssl=False>>).", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:09.731Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "INFO", "event": "AMQPConnector - reporting success: <SelectConnection OPEN transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7d4b551388c0> params=<URLParameters host=rabbitmq port=5672 virtual_host=/ ssl=False>>", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:09.731Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "INFO", "event": "AMQPConnectionWorkflow - reporting success: <SelectConnection OPEN transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7d4b551388c0> params=<URLParameters host=rabbitmq port=5672 virtual_host=/ ssl=False>>", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:09.731Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "INFO", "event": "Connection workflow succeeded: <SelectConnection OPEN transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7d4b551388c0> params=<URLParameters host=rabbitmq port=5672 virtual_host=/ ssl=False>>", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:09.734Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "INFO", "event": "Created channel=1", "correlation_id": null}
+{"timestamp": "2026-11-25T19:22:09.794Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "INFO", "event": "warehouse_heartbeat_published", "correlation_id": null, "event_id": "f53b8e28-525b-407a-bdde-1e4db94638ee"}
+{"timestamp": "2026-11-25T19:22:40.036Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "INFO", "event": "warehouse_heartbeat_published", "correlation_id": null, "event_id": "591d5c0d-cad9-4095-b7d8-e9c622f2e8ea"}
+{"timestamp": "2026-11-25T19:23:10.305Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "INFO", "event": "warehouse_heartbeat_published", "correlation_id": null, "event_id": "c55e8eda-5f7b-47a7-8e75-61dac893b6b4"}
+{"timestamp": "2026-11-25T19:23:40.562Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "INFO", "event": "warehouse_heartbeat_published", "correlation_id": null, "event_id": "7a6e06ba-d71a-4b8a-adb0-7e6e094f9a29"}
+{"timestamp": "2026-11-25T19:24:10.790Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "INFO", "event": "warehouse_heartbeat_published", "correlation_id": null, "event_id": "2e8a6921-81ee-414b-ba6c-6a4e0bf6c151"}
+{"timestamp": "2026-11-25T19:24:40.964Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "INFO", "event": "warehouse_heartbeat_published", "correlation_id": null, "event_id": "164822ed-11dc-4039-adc0-d0a9811d64a0"}
+{"timestamp": "2026-11-25T19:25:11.160Z", "service": "warehouse-worker", "warehouse_id": "WH-003", "level": "INFO", "event": "warehouse_heartbeat_published", "correlation_id": null, "event_id": "2aceaa0d-7bdf-41be-bb1b-7a484f82bac0"}
+========== ESTADO WORKER WH-003 ==========
+CONTAINER ID   IMAGE              COMMAND                  CREATED        STATUS          PORTS      NAMES
+b865c5822db5   e07-wh003_worker   "python -m workers.o…"   16 hours ago   Up 10 minutes   8000/tcp   e07-wh003_worker-1
