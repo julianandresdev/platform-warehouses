@@ -1,0 +1,74 @@
+services:
+  wh001_db:
+    image: postgres:16
+  wh002_db:
+    image: postgres:16
+  wh003_db:
+    image: postgres:16
+  central-db:
+    image: postgres:16
+  nginx:
+    image: nginx:alpine
+    ports: !override ["127.0.0.1:18080:80"]
+  wh001_api:
+    image: d06-warehouse-api:local
+    ports: !override ["127.0.0.1:18101:8000"]
+  wh003_api:
+    image: d06-warehouse-api:local
+    build: null
+    ports: !override ["127.0.0.1:18103:8000"]
+  wh002_api:
+    image: d06-warehouse-api:local
+    build: null
+  wh001_worker:
+    image: d06-warehouse-api:local
+    build: null
+  wh002_worker:
+    image: d06-warehouse-api:local
+    build: null
+  wh003_worker:
+    image: d06-warehouse-api:local
+    build: null
+  wh001_commands:
+    image: d06-warehouse-api:local
+    build: null
+  wh002_commands:
+    image: d06-warehouse-api:local
+    build: null
+  wh003_commands:
+    image: d06-warehouse-api:local
+    build: null
+  wh001_cache_invalidation_worker:
+    image: d06-warehouse-api:local
+    build: null
+  wh002_cache_invalidation_worker:
+    image: d06-warehouse-api:local
+    build: null
+  wh003_cache_invalidation_worker:
+    image: d06-warehouse-api:local
+    build: null
+  wh001_reports_worker:
+    image: d06-warehouse-api:local
+    build: null
+  wh002_reports_worker:
+    image: d06-warehouse-api:local
+    build: null
+  wh003_reports_worker:
+    image: d06-warehouse-api:local
+    build: null
+  rabbitmq_topology:
+    image: d06-warehouse-api:local
+    build: null
+  central-api:
+    image: d06-central:local
+    ports: !override ["127.0.0.1:18004:8000"]
+  central-worker:
+    image: d06-central:local
+    build: null
+  central-audit-worker:
+    image: d06-central:local
+    build: null
+  rabbitmq:
+    ports: !override
+      - "127.0.0.1:25672:5672"
+      - "127.0.0.1:25673:15672"

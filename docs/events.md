@@ -1,6 +1,6 @@
 # Contrato de eventos y comandos
 
-Versión 2 · 25 de noviembre de 2026 · Responsable: David
+Versión 2 · 26 de noviembre de 2026 · Responsable: David
 
 Este documento fija el contrato de mensajes para los servicios del proyecto. Se deriva del plan de desarrollo adjunto. Describe el contrato objetivo; no implica que todos los productores, consumidores o workers estén implementados todavía. Los cambios posteriores deben actualizar este archivo junto con el código que los usa.
 
@@ -40,7 +40,7 @@ Un comando usa el mismo sobre. Para comandos, `event_id` identifica el comando y
 
 ## Propiedades AMQP
 
-Las publicaciones usan `message_id = event_id`, `correlation_id` del sobre, `content_type = application/json` y `delivery_mode = 2` (persistente). El header entero `x-attempt` empieza en `0` y aumenta al republicar por un error transitorio. Los productores del patrón outbox publican solo después del commit de la transacción de negocio. Las colas son durables y los consumidores usan `prefetch_count = 10`, ack manual tras confirmar el efecto y su registro idempotente en la base.
+Las publicaciones usan `message_id = event_id`, `correlation_id` del sobre, `content_type = application/json` y `delivery_mode = 2` (persistente). El header entero `x-attempt` empieza en `0` y aumenta al republicar por un error transitorio; el valor `2` identifica el tercer intento de procesamiento. Los productores del patrón outbox publican solo después del commit de la transacción de negocio. Las colas son durables y los consumidores usan `prefetch_count = 10`, ack manual tras confirmar el efecto y su registro idempotente en la base.
 
 ## Exchanges
 
@@ -52,7 +52,7 @@ Las publicaciones usan `message_id = event_id`, `correlation_id` del sobre, `con
 | `iot.readings` | topic | Lecturas validadas que entrega el gateway IoT. |
 | `dlx` | direct | Dead-letter exchange para mensajes que no pueden procesarse. |
 
-Cada servicio declara, al iniciar, los exchanges y colas que utiliza. `declare_topology()` debe ser idempotente. Las colas de trabajo son durables y configuran `x-dead-letter-exchange = dlx`. Para F10, cada cola de trabajo tendrá además una cola `<cola>.retry` con TTL de 5000 ms y una `<cola>.dlq`; la política de reintentos y el routing de DLQ se especifican en la sección F10 de este documento cuando quede implementada.
+Cada servicio declara, al iniciar, los exchanges y colas que utiliza. `declare_topology()` debe ser idempotente. Las colas de trabajo son durables y configuran `x-dead-letter-exchange = dlx`. Cada cola de trabajo tiene además una cola `<cola>.retry` con TTL de 5000 ms y una `<cola>.dlq`. Al vencer, el mensaje de retry vuelve a la cola original mediante el exchange predeterminado de RabbitMQ.
 
 ## Catálogo de eventos
 
@@ -109,7 +109,22 @@ Todas son durables, tienen `prefetch_count = 10`, ack manual después del commit
 
 ## Errores, reintentos y evolución
 
-Un payload inválido, JSON corrupto o una versión de evento no soportada es un error permanente y se envía a la DLQ con un header `x-error`. Errores transitorios (incluidas excepciones no clasificadas) se reintentan mediante `<cola>.retry`, incrementando `x-attempt`; al tercer intento se envían a `<cola>.dlq`. Los detalles operativos y la herramienta de inspección/reproceso corresponden a D-05.
+JSON corrupto, un sobre o payload inválido y una versión o tipo no soportado son errores permanentes: se envían directamente a `<cola>.dlq` con el header `x-error`. El consumidor confirma el original solo después de que RabbitMQ confirma la publicación en la DLQ. Los workers pueden lanzar `PermanentError` para clasificar explícitamente estos casos. `TransientError` y excepciones no clasificadas se publican en `<cola>.retry` con `x-attempt + 1`; tras el fallo del tercer procesamiento (valor recibido `x-attempt = 2`), se envían a la DLQ. Si la publicación en retry o DLQ no se confirma, se reencola el original.
+
+El CLI `python scripts/dlq.py list <cola>` muestra el conteo y el contenido de hasta 100 mensajes de su DLQ; `replay <cola>` los repone en la cola original con `x-attempt = 0` (hasta 100 por ejecución; usar `--limit` para cambiarlo), y `purge <cola>` los elimina. `list` usa la API de management de RabbitMQ con `ack_requeue_true`, así que consultar no consume los mensajes. El replay confirma primero la publicación en la cola original y después confirma el mensaje de DLQ.
+
+### Idempotencia de consumidores
+
+| Consumidor | Protección contra efectos duplicados |
+| --- | --- |
+| Proyección central | `processed_messages` por `(event_id, consumer)` y actualización condicional por `version`. |
+| Comandos de bodega | Inserción de `processed_messages` dentro de la misma transacción que inventario y outbox; además, los movimientos usan la referencia de transferencia. |
+| Auditoría central | `event_id` es clave primaria; conflicto no inserta otra fila. |
+| Invalidación de caché | `DEL` es naturalmente repetible. |
+| Reportes | El worker bloquea el trabajo y solo procesa trabajos `PROCESSING`; resultados terminales no se vuelven a aplicar. |
+| Orquestación de Saga | Registro de mensajes procesados y transición de estado en una transacción. |
+
+Decisión detallada: [ADR-0015](adr/0015-reintentos-y-dlq.md). Herramienta operativa: [scripts/dlq.py](../scripts/dlq.py).
 
 Los consumidores no deben asumir orden global entre colas. Para inventario, `version` es monotónica por fila y permite ignorar eventos viejos. Para IoT, `sequence_number` es monotónica por sensor; lecturas fuera de orden se conservan, pero no reemplazan el último estado. Cambios incompatibles requieren incrementar `event_version` y acordar el despliegue productor/consumidor; campos nuevos opcionales pueden añadirse manteniendo compatibilidad.
 

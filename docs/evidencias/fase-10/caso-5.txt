@@ -1,0 +1,11 @@
+Caso 5: La central sigue disponible y marca WH-003 obsoleta cuando su API y relay caen
+Fecha UTC: 2026-11-26T04:42:27Z
+Rama: test/D-06-chaos
+OK: API WH-001 lista
+OK: API central lista
+OK: WH-003 con heartbeat conocido
+OK: WH-003 marcada stale
+Estado central: {"count":3,"warehouses":[{"warehouse_id":"WH-001","last_seen_at":"2026-11-26T04:43:13+00:00","last_event_at":"2026-11-26T04:42:15+00:00","stale":false},{"warehouse_id":"WH-002","last_seen_at":"2026-11-26T04:43:14+00:00","last_event_at":null,"stale":false},{"warehouse_id":"WH-003","last_seen_at":"2026-11-26T04:42:13+00:00","last_event_at":null,"stale":true}]}
+Health central: {"status":"ok","service":"central-api"}
+OK: WH-003 API recuperada
+Exit code: 0

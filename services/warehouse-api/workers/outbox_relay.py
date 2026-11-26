@@ -61,7 +61,6 @@ def relay_pending_batch(
                         row["exchange"],
                         row["routing_key"],
                         channel=channel,
-                        attempt=row["attempts"],
                     )
                 except Exception:
                     session.execute(

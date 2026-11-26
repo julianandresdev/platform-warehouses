@@ -4,7 +4,7 @@
 
 Se añadió RabbitMQ con consola de management y healthcheck a los Compose raíz y distribuido. El paquete `services/common` incluye el cliente `common.rabbit` para conexión con reintento, declaración durable e idempotente de exchanges, colas y bindings, publicación JSON persistente con publisher confirms y consumo con ack manual. El consumidor establece el `correlation_id` en el ContextVar compartido mientras ejecuta el handler y confirma el mensaje solo si el handler retorna correctamente.
 
-Los errores del handler se reencolan por ahora. El límite de reintentos y las DLQ pertenecen a D-05. El consumidor usa `set_correlation_id` y `reset_correlation_id` de J-03 para compartir el mismo contexto con el middleware HTTP.
+El manejo inicial reencolaba los errores del handler. D-05 sustituye esa política por reintentos acotados, DLQ y clasificación de errores. El consumidor usa `set_correlation_id` y `reset_correlation_id` de J-03 para compartir el mismo contexto con el middleware HTTP.
 
 ## Contrato
 
@@ -31,7 +31,7 @@ Se verificó también la recuperación real en Compose: con RabbitMQ detenido, `
 - La API invalida Redis sincrónicamente por defecto. Con `CACHE_INVALIDATION=async`, registra el evento en el outbox y omite el `DEL` síncrono; `cache-invalidation-worker` consume `wh-00X.cache-invalidation` y borra la llave. Si Redis no está disponible, el handler falla para que RabbitMQ reencole el mensaje.
 - El worker central consume `central.audit` y escribe el sobre en `audit_events`; `event_id` es la clave primaria y `ON CONFLICT DO NOTHING` hace idempotente la inserción.
 - `POST /reports` acepta un rango UTC (`start_at`, `end_at`), crea `report_jobs` y `REPORT_REQUESTED` en la misma transacción, y responde HTTP 202 con `job_id` y estado `PROCESSING`.
-- El worker de reportes calcula conteos y unidades movidas por tipo, además de los diez SKU más movidos (suma de valores absolutos), y guarda `DONE`/resultado o `FAILED`/error. `GET /reports/jobs/{id}` consulta el estado.
+- El worker de reportes calcula conteos y unidades movidas por tipo, además de los diez SKU más movidos (suma de valores absolutos), y guarda `DONE`/resultado o `FAILED`/error. `GET /reports/jobs/{id}` consulta el estado. Con `REPORTS_TO_S3=true` el resultado también se escribe en `reports/jobs/<job_id>.json` (J-08, ver [fase 8](fase-8.md)).
 - Los consumidores reutilizan el `correlation_id` del sobre; el formatter JSON lo incluye en los logs de API y workers.
 
 La tabla `report_jobs` está en `schema.sql` y en la migración `002_report_jobs.sql`. Para un volumen de base ya creado, ejecutar una vez `docker compose exec db psql -U admin -d platform -v ON_ERROR_STOP=1 -f /sql/migrations/002_report_jobs.sql`.
