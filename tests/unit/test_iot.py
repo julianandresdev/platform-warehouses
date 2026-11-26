@@ -1,12 +1,35 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
 
-from app.alerts import advance_streak
-from app.schemas import SensorReading, routing_key_for, validate_topic
-from app.spool import SensorSpool
+# El servicio IoT tiene un paquete ``app`` y la bodega y la central tienen otro ``app``
+# (módulo y paquete). Meter ``services/iot`` en el ``sys.path`` global de conftest hacía
+# que esas pruebas importaran el ``app`` equivocado: se importa aquí, aislado, y se
+# restauran ``sys.path`` y ``sys.modules``.
+IOT = Path(__file__).resolve().parents[2] / "services" / "iot"
+
+
+def _is_app(name: str) -> bool:
+    return name == "app" or name.startswith("app.")
+
+
+_saved = {name: module for name, module in sys.modules.items() if _is_app(name)}
+for _name in _saved:
+    del sys.modules[_name]
+sys.path.insert(0, str(IOT))
+try:
+    from app.alerts import advance_streak
+    from app.schemas import SensorReading, routing_key_for, validate_topic
+    from app.spool import SensorSpool
+finally:
+    sys.path.remove(str(IOT))
+    for _name in [n for n in sys.modules if _is_app(n)]:
+        del sys.modules[_name]
+    sys.modules.update(_saved)
 
 
 def reading(**overrides):
