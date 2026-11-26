@@ -15,7 +15,6 @@ import json
 import os
 import socketserver
 import threading
-import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest

@@ -4,3 +4,4 @@ psycopg[binary]
 pytest
 httpx
 fakeredis
+ruff==0.17.6

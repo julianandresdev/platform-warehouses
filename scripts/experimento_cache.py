@@ -123,7 +123,9 @@ def main():
     sh("docker", "compose", "up", "-d", "--force-recreate", "api")  # deja la caché activa
 
     on, off = results
-    pct = lambda v: "n/a" if v is None else f"{v * 100:.1f} %"
+    def pct(v):
+        return "n/a" if v is None else f"{v * 100:.1f} %"
+
     lines = [
         f"# Resultado del experimento de caché ({USERS} usuarios, {DURATION}, mismo SKU, espera máx. {os.getenv('LOAD_WAIT', '0.05')} s)",
         "",

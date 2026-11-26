@@ -1,0 +1,163 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install ruff (version pinned in requirements-dev.txt)
+        run: python -m pip install "$(grep '^ruff==' requirements-dev.txt)"
+
+      - name: Ruff check
+        run: ruff check .
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: admin
+          POSTGRES_DB: platform_test
+        ports:
+          - 5542:5432
+        options: >-
+          --health-cmd "pg_isready -U admin -d platform_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      central-postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: central
+          POSTGRES_PASSWORD: central
+          POSTGRES_DB: central_test
+        ports:
+          - 5543:5432
+        options: >-
+          --health-cmd "pg_isready -U central -d central_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+      rabbitmq:
+        image: rabbitmq:3-management
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://admin:admin@127.0.0.1:5542/platform_test
+      E02_DATABASE_URL: postgresql+psycopg2://admin:admin@127.0.0.1:5542/platform_test
+      REDIS_URL: redis://127.0.0.1:6379/0
+      RABBITMQ_URL: amqp://guest:guest@127.0.0.1:5672/%2F
+      API_KEY: e02-test-key
+      WAREHOUSE_ID: WH-001
+      CACHE_ENABLED: "false"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements-dev.txt
+            services/*/requirements.txt
+            services/common/pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+          python -m pip install -r services/central/requirements.txt \
+            -r services/iot/requirements.txt
+
+      - name: Initialize warehouse schema and migrations
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i "$POSTGRES_CONTAINER" \
+            psql -U admin -d platform_test -v ON_ERROR_STOP=1 \
+            < infrastructure/sql/warehouse/schema.sql
+
+          for file in infrastructure/sql/warehouse/migrations/*.sql; do
+            [ -f "$file" ] || continue
+            docker exec -i "$POSTGRES_CONTAINER" \
+              psql -U admin -d platform_test -v ON_ERROR_STOP=1 < "$file"
+          done
+
+      - name: Initialize central schema
+        env:
+          CENTRAL_POSTGRES_CONTAINER: ${{ job.services.central-postgres.id }}
+        run: |
+          docker exec -i "$CENTRAL_POSTGRES_CONTAINER" \
+            psql -U central -d central_test -v ON_ERROR_STOP=1 \
+            < infrastructure/sql/central/schema.sql
+
+      # Se ejecutan por separado: los tests de central y de warehouse-api
+      # importan paquetes distintos llamados `app` y chocan en un mismo proceso.
+      - name: Unit tests
+        run: python -m pytest tests/unit -v
+
+      # Los tests de MinIO (test_storage, test_report_validator_minio) y los de
+      # API en vivo (test_inventory_cache) se omiten solos si no hay servicio.
+      - name: Integration tests
+        run: >-
+          python -m pytest tests/integration
+          --ignore=tests/integration/fase3/central_audit -v -rs
+
+      - name: Integration tests (central audit)
+        env:
+          DATABASE_URL: postgresql+psycopg2://central:central@127.0.0.1:5543/central_test
+          PYTHONPATH: services/central:services/common
+        run: >-
+          python -m pytest --confcutdir=tests/integration/fase3/central_audit
+          tests/integration/fase3/central_audit/test_d04_audit.py -v

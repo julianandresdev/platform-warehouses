@@ -6,7 +6,6 @@ import json
 import sqlite3
 from pathlib import Path
 from typing import Any
-from uuid import UUID
 
 
 class SensorSpool:

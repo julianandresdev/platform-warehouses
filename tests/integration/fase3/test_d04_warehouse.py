@@ -17,7 +17,6 @@ def resources():
 
     import cache
     import config
-    import schemas
     from app import app
     from common.events import new_event
     from common.rabbit import connect, consume, declare_topology, publish
