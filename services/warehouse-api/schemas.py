@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from models import MovementType
+from models import MANUAL_MOVEMENT_TYPES, MovementType
 
 
 class ProductCreate(BaseModel):
@@ -47,6 +47,13 @@ class MovementCreate(BaseModel):
     type: MovementType
     quantity: int = Field(ge=0)
     reference: Optional[str] = Field(default=None, max_length=255)
+
+    @model_validator(mode="after")
+    def type_must_be_manual(self):
+        # Los movimientos de transferencia los registra solo el worker de la Saga.
+        if self.type not in MANUAL_MOVEMENT_TYPES:
+            raise ValueError("type debe ser RECEIPT, SHIPMENT o ADJUSTMENT")
+        return self
 
     @model_validator(mode="after")
     def quantity_must_be_positive_unless_adjustment(self):

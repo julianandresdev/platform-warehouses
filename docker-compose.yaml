@@ -109,6 +109,27 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # Pasos de la Saga (F6): consume wh-00X.commands y responde por el outbox.
+  commands-worker:
+    build: {context: ./services, dockerfile: warehouse-api/Dockerfile}
+    command: ["python", "-m", "workers.commands"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://admin:admin@db:5432/platform
+      WAREHOUSE_ID: ${WAREHOUSE_ID:-WH-001}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+      REDIS_URL: redis://redis:6379/0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Solo pruebas: <COMANDO>:before_commit|after_commit (ver workers/commands.py).
+      CHAOS_FAIL_STEP: ${CHAOS_FAIL_STEP:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
 
   central-db:
     image: postgres:16
@@ -155,7 +176,77 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Almacenamiento S3 local (S-05). No arranca con `docker compose up`:
+  #   docker compose --profile storage up -d
+  # API S3 en 9000. El 9001 es el puerto de consola que pide el issue #26, pero esta
+  # versión de MinIO no sirve la interfaz web ahí (comprobado): ver ADR-0011.
+  minio:
+    image: bitnamilegacy/minio:2025.7.23
+    profiles: ["storage"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Crea el bucket y termina (restart: "no"). Es idempotente (--ignore-existing).
+  minio-init:
+    image: bitnamilegacy/minio-client:2025.7.21
+    profiles: ["storage"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
+        mc mb --ignore-existing local/$${S3_BUCKET}
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      S3_BUCKET: ${S3_BUCKET:-warehouse-platform}
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+
+  # Reporte diario (J-08): corre una vez y termina. Lee cada bodega por su API.
+  #   docker compose --profile storage run --rm batch python -m batch.daily_report --date 2026-11-24
+  # Este Compose solo tiene la bodega WH-001 (`api`); WH-002 y WH-003 se apuntan con
+  # WH002_API_URL / WH003_API_URL (p. ej. a compose.distributed.yml vía host.docker.internal)
+  # y, mientras no estén configuradas, el reporte sale PARTIAL.
+  batch:
+    build: {context: ./services, dockerfile: batch/Dockerfile}
+    profiles: ["storage"]
+    environment:
+      WH001_API_URL: ${WH001_API_URL:-http://api:8000}
+      WH002_API_URL: ${WH002_API_URL:-}
+      WH003_API_URL: ${WH003_API_URL:-}
+      API_KEY: ${API_KEY:-dev-api-key}
+      CENTRAL_API_URL: ${CENTRAL_API_URL:-http://central-api:8000}
+      CENTRAL_API_KEY: ${CENTRAL_API_KEY:-dev-central-key}
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_BUCKET: ${S3_BUCKET:-warehouse-platform}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+      central-api:
+        condition: service_started
+    restart: "no"
+
 volumes:
   central_pgdata: {}
   pgdata: {}
   rabbitmq_data: {}
+  minio_data: {}

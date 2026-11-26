@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -141,6 +143,48 @@ def get_inventory(db: Session, sku: str):
             models.Inventory.warehouse_id == config.WAREHOUSE_ID,
         )
         .first()
+    )
+
+
+def list_inventory(db: Session):
+    """Foto del inventario de esta bodega (todas las filas), ordenada por producto."""
+
+    return (
+        db.query(models.Inventory)
+        .filter(models.Inventory.warehouse_id == config.WAREHOUSE_ID)
+        .order_by(models.Inventory.product_id)
+        .all()
+    )
+
+
+def _naive_utc(value: datetime) -> datetime:
+    """`created_at` se guarda como TIMESTAMP sin zona (UTC): se convierte antes de comparar."""
+
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def list_movements(
+    db: Session, start: datetime, end: datetime, page: int, page_size: int
+):
+    """Movimientos de esta bodega con ``start <= created_at < end``, paginados.
+
+    Orden estable por ``created_at`` e ``id`` para que ``page`` no repita ni salte filas.
+    Un instante sin zona horaria se interpreta como UTC.
+    """
+
+    return (
+        db.query(models.InventoryMovement)
+        .filter(
+            models.InventoryMovement.warehouse_id == config.WAREHOUSE_ID,
+            models.InventoryMovement.created_at >= _naive_utc(start),
+            models.InventoryMovement.created_at < _naive_utc(end),
+        )
+        .order_by(models.InventoryMovement.created_at, models.InventoryMovement.id)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
     )
 
 

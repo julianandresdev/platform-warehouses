@@ -1,0 +1,1 @@
+{"id":1,"sku":"P-001","product_id":1,"warehouse_id":"WH-003","quantity":55,"reserved_quantity":0,"available_quantity":55,"version":1,"updated_at":"2026-11-25T03:24:44.532995"}

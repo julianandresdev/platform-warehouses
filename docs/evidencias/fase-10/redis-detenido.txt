@@ -1,0 +1,2 @@
+CONTAINER ID   IMAGE            COMMAND                  CREATED        STATUS                              PORTS     NAMES
+b8a8687ec354   redis:7-alpine   "docker-entrypoint.s…"   16 hours ago   Exited (0) Less than a second ago             e07-wh001_redis-1
