@@ -53,7 +53,7 @@ En AWS no hay Grafana ni acceso a la instancia: los pasos `caos`, `bodega-caida`
 | 12 | Grafana | `scripts/demo.sh carga` | Con 100 usuarios sobre WH-001, mostrar en vivo los dashboards APIs, Redis, RabbitMQ, Workers y Saga. |
 | 14 | IoT | — | No hay servicio IoT en el repositorio: la fase 12 está sin documentar y no existe código de IoT. No se puede demostrar. |
 
-Los minutos son orientativos; el ensayo local completo tardó unos 3,5 minutos de ejecución (103 s son la espera de la caída de bodega) más la narración.
+Los minutos son orientativos; el ensayo local completo tardó unos 3,5 minutos de ejecución (101 s son la caída de bodega con su espera de 95 s) más la narración.
 
 ## Pruebas de funcionamiento
 
