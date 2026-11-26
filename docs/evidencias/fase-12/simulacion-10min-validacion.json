@@ -12,5 +12,5 @@
   "huecos_de_secuencia_observados": 216,
   "entregas_fuera_de_orden": 1412,
   "alertas_emitidas": 81,
-  "nota": "El muestreo se tomó al finalizar el simulador; la verificación no alcanzó el balance esperado dentro de su ventana. La corrida corta y una corrida diagnóstica de 180 s sí cerraron con balance exacto y cero huecos."
+  "nota": "Esta corrida precedió al ajuste max_queued_messages de Mosquitto. El muestreo al cierre no alcanzó el balance esperado dentro de la ventana. La corrida corta y una corrida diagnóstica de 180 s sí cerraron con balance exacto y cero huecos; una nueva corrida de diez minutos con el ajuste final se inició y se interrumpió antes de completarse."
 }
