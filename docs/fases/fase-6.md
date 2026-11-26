@@ -102,18 +102,26 @@ stateDiagram-v2
 ### Cobertura de los seis experimentos del plan
 
 El [registro de integración](../evidencias/fase-6/e06-integracion.md)
-documenta el caso 100/20 → 70/50, con 175 unidades totales al
-incluir WH-003. Las cinco corridas de ese registro abarcan casos
-distintos de los seis experimentos del plan.
+documenta el caso 100/20 → 70/50. En las corridas operativas se usó
+un SKU de prueba con 175 unidades entre las tres bodegas. El
+[registro operativo](../evidencias/fase-6/e06-experimentos-operativos.json)
+conserva el historial de la API y las lecturas de PostgreSQL.
+Cada lectura registra cantidad, reserva y versión, en ese orden.
 
-| Experimento del plan | Evidencia disponible | Evidencia por completar |
-| --- | --- | --- |
-| Origen detenido antes de reservar | Timeout de reserva verificado | Historial con la bodega detenida e inventario antes y después |
-| Fallo después de reservar | Corrida real con liberación anticipada de la reserva y conservación de 175 unidades | Repetición con la inyección prevista por el plan |
-| Destino temporalmente caído | Destino pendiente y alerta verificados con simulación | Historial desde la detención de WH-002 hasta completar la transferencia |
-| Comando RabbitMQ duplicado | Eventos duplicados probados e idempotencia HTTP verificada con bodegas reales | Republicación del comando y comprobación de que no repite el movimiento |
-| Timeout con confirmación tardía | Timeout y liberación tardía verificados | Historial de la corrida con pausa del consumidor de origen |
-| Reinicio del orquestador | Recuperación del worker verificada | Historial de una transferencia real e inventario antes y después |
+| Experimento del plan | Resultado observado |
+| --- | --- |
+| Origen detenido antes de reservar | Se detuvo su consumidor de comandos. La transferencia terminó en `FAILED` por vencimiento y el inventario quedó intacto al restaurar el consumidor. |
+| Fallo después de reservar | La [corrida de integración](../evidencias/fase-6/e06-integracion.md#5-fallo-definitivo-de-envío) indujo un rechazo definitivo al liberar anticipadamente la reserva. Se observó `TRANSFER_SHIP_FAILED`, compensación y `CANCELLED`, con 175 unidades y cero reservas. |
+| Destino temporalmente caído | Con su consumidor detenido, quedó en `DESTINATION_PENDING` y 3 unidades estaban en tránsito. Tras restaurarlo, terminó en `COMPLETED` y se recuperó el total de 175 unidades en las bases de bodega. |
+| Comando RabbitMQ duplicado | Se republicó el mismo `SHIP_TRANSFER` con el mismo identificador. El worker registró el duplicado. Cantidades, reservas y versiones permanecieron iguales. |
+| Timeout con confirmación tardía | Se detuvo el publicador del outbox de origen. La reserva se confirmó localmente antes del plazo y llegó a central después de `FAILED`. Se publicó `RELEASE_RESERVATION` y el stock disponible volvió a su valor inicial. |
+| Reinicio del orquestador | Se reinició el worker con la transferencia en `DESTINATION_PENDING`. El historial persistió y, al restaurar el consumidor de destino, la Saga terminó en `COMPLETED` con 175 unidades. |
+
+Para el fallo posterior a reserva se usó un rechazo definitivo del
+handler real. La opción `CHAOS_FAIL_STEP=SHIP_TRANSFER:before_commit`
+revierte el paso y reencola el comando. Ese mecanismo prueba el
+reintento y requiere una corrida aparte si se exige la inyección
+exacta del plan.
 
 ### Limitaciones y pendientes
 
