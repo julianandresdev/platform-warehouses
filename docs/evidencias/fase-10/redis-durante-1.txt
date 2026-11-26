@@ -1,0 +1,12 @@
+2026-11-25T14:19:55-05:00
+HTTP/1.1 200 OK
+date: Wed, 25 Nov 2026 19:19:55 GMT
+server: uvicorn
+content-length: 177
+content-type: application/json
+x-cache: BYPASS
+x-correlation-id: COR-20261125-cce99626
+
+{"id":1,"sku":"P-001","product_id":1,"warehouse_id":"WH-001","quantity":100,"reserved_quantity":0,"available_quantity":100,"version":1,"updated_at":"2026-11-25T03:24:43.261380"}
+HTTP: 200
+Tiempo: 3.416157 s

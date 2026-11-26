@@ -1,0 +1,8 @@
+HTTP/1.1 201 Created
+date: Wed, 25 Nov 2026 19:26:23 GMT
+server: uvicorn
+content-length: 188
+content-type: application/json
+x-correlation-id: COR-E07-WH003-SYNC-1795634780-SHIPMENT
+
+{"id":12,"sku":"P-001","product_id":1,"warehouse_id":"WH-003","type":"SHIPMENT","quantity":1,"reference":"COR-E07-WH003-SYNC-1795634780-SHIPMENT","created_at":"2026-11-25T19:26:23.411408"}
