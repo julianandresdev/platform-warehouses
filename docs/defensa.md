@@ -18,7 +18,7 @@ Las bodegas sanas continúan operando. CQRS conserva el último dato y marca la 
 
 ### 4. ¿Cómo aumentar capacidad solo en la bodega con más demanda?
 
-Agregar réplicas de su API detrás de nginx y medir latencia, errores y saturación de PostgreSQL. En WH-002, las réplicas comparten PostgreSQL y Redis, por lo que un cuello de botella de datos requiere otro ajuste. [Referencia](fases/fase-5.md)
+Agregar réplicas de su API detrás de nginx y medir latencia, errores y saturación de PostgreSQL. En WH-002, las réplicas comparten PostgreSQL y Redis, por lo que un cuello de botella de datos requiere otro ajuste. La ganancia hay que medirla: en F5, una réplica dio 383 req/s y tres dieron 884 req/s, pero la réplica única ya devolvía 504. J-09, con 200 usuarios, no mostró diferencia (963 frente a 995 req/s) y Locust estaba cerca de saturar un núcleo. [Referencia](fases/fase-5.md)
 
 ### 5. ¿Cómo se limita el impacto de un fallo local sobre las demás bodegas?
 
@@ -28,7 +28,7 @@ Se aíslan API, base y caché por bodega. El outbox desacopla escrituras locales
 
 ### 6. ¿Qué aporta Redis a las lecturas de inventario?
 
-Cache Aside evita repetir consultas a PostgreSQL cuando varios clientes piden el mismo SKU. Redis reduce latencia y carga mientras PostgreSQL conserva el estado de referencia. [Referencia](adr/0008-cache-aside-con-redis.md)
+Cache Aside evita repetir consultas a PostgreSQL cuando varios clientes piden el mismo SKU. Redis reduce latencia y carga mientras PostgreSQL conserva el estado de referencia. En J-09, con la misma carga, Redis activado dio 785,7 req/s y P95 de 240 ms, frente a 468,9 req/s y 550 ms sin Redis. [Referencia](adr/0008-cache-aside-con-redis.md)
 
 ### 7. ¿Cómo responde la API durante una caída de Redis?
 
@@ -44,7 +44,7 @@ Redis no tiene una entrada utilizable para la clave. La API consulta PostgreSQL 
 
 ### 10. ¿Qué riesgo introduce una entrada obsoleta?
 
-La lectura puede mostrar una cantidad diferente de la confirmada tras un movimiento. Las escrituras verifican existencias contra PostgreSQL dentro de una transacción y la invalidación con TTL reduce la ventana de discrepancia. [Referencia](adr/0008-cache-aside-con-redis.md)
+La lectura puede mostrar una cantidad diferente de la confirmada tras un movimiento. Las escrituras verifican existencias contra PostgreSQL dentro de una transacción y la invalidación con TTL reduce la ventana de discrepancia. El TTL documentado es de 30 segundos; uno más corto aumenta los misses y la carga en PostgreSQL. [Referencia](adr/0008-cache-aside-con-redis.md)
 
 ## RabbitMQ · 11 a 15
 
@@ -98,7 +98,7 @@ Para consultar inventario consolidado con una sola lectura y separar el rendimie
 
 ### 22. ¿Qué costo tiene consultar todas las bodegas en cada solicitud?
 
-Fan-out multiplica llamadas y la latencia depende de las APIs lentas o inaccesibles. En la prueba de F7, CQRS obtuvo P95 de 200 ms frente a 580 ms de Fan-out durante la operación normal. [Referencia](fases/fase-7.md)
+Fan-out multiplica llamadas y la latencia depende de las APIs lentas o inaccesibles. En la prueba de F7, durante la operación normal CQRS obtuvo P95 de 200 ms frente a 580 ms de Fan-out, y 98,5 frente a 42,6 req/s. Con una bodega inaccesible, CQRS respondió 6.283 de 6.283 solicitudes y Fan-out solo 8 de 1.386 (0,58 %). [Referencia](fases/fase-7.md)
 
 ### 23. ¿Qué significa que el inventario de la vista global esté atrasado?
 
@@ -212,6 +212,25 @@ con estados persistentes, idempotencia y compensaciones.
 
 Los resultados corresponden a experimentos locales
 realizados bajo condiciones especificas.
+
+Las filas de F2 y F5 son las corridas históricas de cada fase. J-09
+repitió esas comparaciones con otra carga y configuración, y sus
+cifras no coinciden con las de la tabla:
+
+| Experimento J-09 | Sin la mejora | Con la mejora |
+| --- | ---: | ---: |
+| Redis, RPS | 468.9 sin Redis | 785.7 con Redis |
+| Redis, P95 | 550 ms sin Redis | 240 ms con Redis |
+| WH-002, RPS | 963.0 con 1 instancia | 995.1 con 3 instancias |
+| WH-002, P95 | 240 ms con 1 instancia | 320 ms con 3 instancias |
+
+La mejora de Redis se confirma. La de pasar de una a tres réplicas no
+se reproduce en J-09: con 200 usuarios no hubo diferencia y Locust
+pudo limitar el resultado, y la corrida histórica de F5 partía de una
+réplica que ya devolvía 504. Al citar F5 en la defensa, indicar esas
+condiciones. Detalle en
+[load-testing.md](load-testing.md) y
+[evidencias/fase-11/README.md](evidencias/fase-11/README.md).
 
 ### Trade-offs
 
