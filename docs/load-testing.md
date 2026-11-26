@@ -286,7 +286,9 @@ pero no demuestran todavía capacidad para 100 bodegas.
 - Resultados históricos de F2 y F5 consolidados.
 - Escenarios 3 y 4 pendientes de resultados oficiales J-09.
 - Pendientes: scripts D-06, matriz de errores, CSV de Locust,
-  capturas de Grafana y trazabilidad de una transferencia.
+  y capturas de Grafana.
+- Transferencia completa y recuperación del destino verificadas por
+  [identificador de correlación](evidencias/fase-11/traza-transferencia-saga.json).
 - Pendiente de revisión final de Julian.
 
 Los resultados históricos de carga corresponden a

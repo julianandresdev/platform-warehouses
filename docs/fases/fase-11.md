@@ -59,8 +59,12 @@ de correlación de movimientos de inventario.
 
 [Evidencia](../evidencias/fase-10/worker-outbox-publicado.txt).
 
-La trazabilidad de una transferencia Saga completa
-queda pendiente de incorporación.
+En la prueba local, la API devolvió HTTP 202. Con el mismo
+`correlation_id` se siguieron la reserva y el envío en WH-001,
+la espera en `DESTINATION_PENDING`, la recepción al restaurar
+WH-002 y el estado final `COMPLETED`.
+
+[Historial y logs correlacionados de la transferencia](../evidencias/fase-11/traza-transferencia-saga.json).
 
 ### ¿Cómo escalar a 100 bodegas con cargas diferentes?
 
@@ -85,7 +89,7 @@ La justificación cuantitativa se completará con J-09.
 - [ ] Resultados de carga progresiva.
 - [ ] CSV de Locust.
 - [ ] Capturas de Grafana y consumo de recursos.
-- [ ] Trazabilidad de transferencia completa.
+- [x] Trazabilidad de transferencia completa en el entorno local.
 - [ ] Revisión final.
 
 Las preguntas anteriores son una síntesis técnica
