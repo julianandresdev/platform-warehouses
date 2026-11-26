@@ -1,0 +1,162 @@
+{
+  "transfer_id": "a3dc4b13-adac-4a4b-93ba-fde154cf57a1",
+  "correlation_id": "COR-20261126-8b38c9a0",
+  "status": "COMPLETED",
+  "history": [
+    {
+      "previous_status": null,
+      "new_status": "REQUESTED",
+      "reason": null,
+      "correlation_id": "COR-20261126-8b38c9a0",
+      "created_at": "2026-11-26T02:26:32.287540+00:00"
+    },
+    {
+      "previous_status": "REQUESTED",
+      "new_status": "RESERVING_SOURCE",
+      "reason": null,
+      "correlation_id": "COR-20261126-8b38c9a0",
+      "created_at": "2026-11-26T02:26:32.287540+00:00"
+    },
+    {
+      "previous_status": "RESERVING_SOURCE",
+      "new_status": "SOURCE_RESERVED",
+      "reason": null,
+      "correlation_id": "COR-20261126-8b38c9a0",
+      "created_at": "2026-11-26T02:26:32.546131+00:00"
+    },
+    {
+      "previous_status": "SOURCE_RESERVED",
+      "new_status": "IN_TRANSIT",
+      "reason": null,
+      "correlation_id": "COR-20261126-8b38c9a0",
+      "created_at": "2026-11-26T02:26:33.150007+00:00"
+    },
+    {
+      "previous_status": "IN_TRANSIT",
+      "new_status": "DESTINATION_PENDING",
+      "reason": null,
+      "correlation_id": "COR-20261126-8b38c9a0",
+      "created_at": "2026-11-26T02:26:33.150007+00:00"
+    },
+    {
+      "previous_status": "DESTINATION_PENDING",
+      "new_status": "DESTINATION_RECEIVED",
+      "reason": null,
+      "correlation_id": "COR-20261126-8b38c9a0",
+      "created_at": "2026-11-26T02:26:38.485807+00:00"
+    },
+    {
+      "previous_status": "DESTINATION_RECEIVED",
+      "new_status": "COMPLETED",
+      "reason": null,
+      "correlation_id": "COR-20261126-8b38c9a0",
+      "created_at": "2026-11-26T02:26:38.485807+00:00"
+    }
+  ],
+  "log_lines": {
+    "central-api": [
+      {
+        "timestamp": "2026-11-26T02:26:32.315Z",
+        "service": "central-api",
+        "warehouse_id": null,
+        "level": "INFO",
+        "event": "request",
+        "correlation_id": "COR-20261126-8b38c9a0",
+        "method": "POST",
+        "path": "/transfers",
+        "status": 202,
+        "duration_ms": 43.36
+      }
+    ],
+    "central-worker": [
+      {
+        "timestamp": "2026-11-26T02:26:32.610Z",
+        "service": "central-worker",
+        "warehouse_id": null,
+        "level": "INFO",
+        "event": "saga_transition_completed",
+        "correlation_id": "COR-20261126-8b38c9a0",
+        "transfer_id": "a3dc4b13-adac-4a4b-93ba-fde154cf57a1",
+        "event_type": "STOCK_RESERVED",
+        "status": "SOURCE_RESERVED"
+      },
+      {
+        "timestamp": "2026-11-26T02:26:33.197Z",
+        "service": "central-worker",
+        "warehouse_id": null,
+        "level": "INFO",
+        "event": "saga_transition_completed",
+        "correlation_id": "COR-20261126-8b38c9a0",
+        "transfer_id": "a3dc4b13-adac-4a4b-93ba-fde154cf57a1",
+        "event_type": "TRANSFER_SHIPPED",
+        "status": "DESTINATION_PENDING"
+      },
+      {
+        "timestamp": "2026-11-26T02:26:38.499Z",
+        "service": "central-worker",
+        "warehouse_id": null,
+        "level": "INFO",
+        "event": "saga_transition_completed",
+        "correlation_id": "COR-20261126-8b38c9a0",
+        "transfer_id": "a3dc4b13-adac-4a4b-93ba-fde154cf57a1",
+        "event_type": "TRANSFER_RECEIVED",
+        "status": "COMPLETED"
+      }
+    ],
+    "wh001_commands": [
+      {
+        "timestamp": "2026-11-26T02:26:32.453Z",
+        "service": "warehouse-commands",
+        "warehouse_id": "WH-001",
+        "level": "INFO",
+        "event": "command_processed",
+        "correlation_id": "COR-20261126-8b38c9a0",
+        "command": "RESERVE_STOCK",
+        "event_id": "e75dcedd-c1d8-45d4-bbb0-e6c9e3ae0bbf",
+        "transfer_id": "a3dc4b13-adac-4a4b-93ba-fde154cf57a1",
+        "sku": "E06-VERIFY-b3d13672",
+        "quantity": 3,
+        "response": "STOCK_RESERVED",
+        "reason": null,
+        "movement_type": "RESERVATION",
+        "note": null
+      },
+      {
+        "timestamp": "2026-11-26T02:26:33.044Z",
+        "service": "warehouse-commands",
+        "warehouse_id": "WH-001",
+        "level": "INFO",
+        "event": "command_processed",
+        "correlation_id": "COR-20261126-8b38c9a0",
+        "command": "SHIP_TRANSFER",
+        "event_id": "684c56f8-e019-47b1-9e82-b5daf4fcd01e",
+        "transfer_id": "a3dc4b13-adac-4a4b-93ba-fde154cf57a1",
+        "sku": "E06-VERIFY-b3d13672",
+        "quantity": 3,
+        "response": "TRANSFER_SHIPPED",
+        "reason": null,
+        "movement_type": "TRANSFER_OUT",
+        "note": null
+      }
+    ],
+    "wh002_commands": [
+      {
+        "timestamp": "2026-11-26T02:26:38.222Z",
+        "service": "warehouse-commands",
+        "warehouse_id": "WH-002",
+        "level": "INFO",
+        "event": "command_processed",
+        "correlation_id": "COR-20261126-8b38c9a0",
+        "command": "RECEIVE_TRANSFER",
+        "event_id": "c69b2308-2506-482b-b9cf-140e71b329f6",
+        "transfer_id": "a3dc4b13-adac-4a4b-93ba-fde154cf57a1",
+        "sku": "E06-VERIFY-b3d13672",
+        "quantity": 3,
+        "response": "TRANSFER_RECEIVED",
+        "reason": null,
+        "movement_type": "TRANSFER_IN",
+        "note": null
+      }
+    ]
+  }
+}

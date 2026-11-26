@@ -1,0 +1,2 @@
+CONTAINER ID   IMAGE              COMMAND                  CREATED        STATUS                                PORTS     NAMES
+36ad3f0d647b   e07-wh001_worker   "python -m workers.o…"   16 hours ago   Exited (137) Less than a second ago             e07-wh001_worker-1
