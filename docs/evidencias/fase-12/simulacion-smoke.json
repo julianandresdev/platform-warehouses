@@ -1,7 +1,7 @@
 {
-  "started_at": "2026-11-26T05:55:15.692230+00:00",
-  "finished_at": "2026-11-26T05:55:23.706791+00:00",
-  "duration_seconds": 8.016,
+  "started_at": "2026-11-26T06:11:56.429576+00:00",
+  "finished_at": "2026-11-26T06:12:04.758345+00:00",
+  "duration_seconds": 8.329,
   "sensor_count": 10,
   "warehouse_ids": [
     "WH-001",
@@ -11,14 +11,14 @@
     "WH-005"
   ],
   "publish_interval_seconds": 0.2,
-  "generated_unique": 400,
-  "mqtt_publish_acknowledged": 497,
-  "intentional_duplicate_publishes": 97,
-  "buffered_at_outage_start": 2,
+  "generated_unique": 250,
+  "mqtt_publish_acknowledged": 310,
+  "intentional_duplicate_publishes": 60,
+  "buffered_at_outage_start": 10,
   "buffer_remaining": 0,
   "dup_rate": 0.25,
   "reorder_rate": 0.2,
   "simulated_outage_start_seconds": 2,
   "simulated_outage_duration_seconds": 2,
-  "cycles": 40
+  "cycles": 25
 }

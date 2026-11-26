@@ -167,7 +167,6 @@ def run() -> dict[str, Any]:
                 connected.clear()
                 outage_started = True
                 simulated_outages.inc()
-                buffered_at_outage = spool.count()
 
             if outage_started and not outage_finished and elapsed >= outage_end:
                 client.connect(config.MQTT_HOST, config.MQTT_PORT, config.MQTT_KEEPALIVE)
@@ -195,6 +194,9 @@ def run() -> dict[str, Any]:
                         _publish(client, row, spool)
             else:
                 pending_readings.set(spool.count())
+                if outage_started and not outage_finished and buffered_at_outage == 0:
+                    # Count after queuing the first offline batch, not before it.
+                    buffered_at_outage = spool.count()
 
             cycle += 1
             next_cycle += config.PUBLISH_INTERVAL_SECONDS
