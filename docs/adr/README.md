@@ -20,7 +20,7 @@ documentar nuevas decisiones.
 | [0008](0008-cache-aside-con-redis.md) | Cache Aside con Redis | Julian | Disponible |
 | [0009](0009-nginx-y-health-checks-pasivos.md) | Nginx y health checks pasivos | Santiago | Borrador pendiente de revisión |
 | [0010](0010-autenticacion-api-key.md) | API Key | Esteban | Pendiente de revision |
-| [0011](0011-minio-local-y-s3-en-aws.md) | MinIO y S3 | Santiago | Borrador pendiente de revisión |
+| [0011](0011-minio-local-y-s3-en-aws.md) | MinIO y S3 | Santiago | Disponible (S-05, PR #62) |
 | [0012](0012-proyeccion-cqrs.md) | CQRS y Heartbeat | Esteban | Recuperado de E-04/E-06 |
 | [0013](0013-saga-orquestada.md) | Saga orquestada | Esteban | Recuperado de E-06 |
 | [0014](0014-batch-csv-s3.md) | Batch y S3 | Julian / Santiago | Propuesta pendiente |
