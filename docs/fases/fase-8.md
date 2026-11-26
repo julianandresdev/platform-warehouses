@@ -32,3 +32,97 @@ Los prefijos `warehouses/`, `reports/` y `metadata/` son los que nombran los iss
 
 - `GET http://localhost:9000/minio/health/live` responde 200.
 - La consola web no responde en el puerto 9001 con esta versión de MinIO (se comprobó dentro del contenedor).
+
+## Avance J-08 — Reporte diario del batch
+
+El batch es un trabajo que corre una vez y termina, fuera de cualquier request. Lee cada bodega **por su API** (no por su base), escribe los resultados en el bucket y registra la ejecución en la central. La decisión está en [ADR-0014](../adr/0014-batch-lee-bodegas-por-api.md).
+
+- **Bodega:** `GET /inventory` (foto) y `GET /movements?from=&to=&page=&page_size=`, de solo lectura y con `X-API-Key`.
+- **Batch:** `python -m batch.daily_report --date YYYY-MM-DD` (por defecto, ayer en UTC), servicio `batch` del profile `storage` con `restart: "no"`.
+- **Salida:** `warehouses/WH-00X/YYYY/MM/inventory-YYYY-MM-DD.json` y `reports/daily/YYYY-MM-DD/summary.json`, ambos con el metadato `correlation-id`.
+- **Central:** `POST /internal/batch-runs` con `run_id`, `report_date`, `status`, `started_at`, `finished_at` y `objects`.
+
+```bash
+# Con las tres bodegas de compose.distributed.yml arriba (WH-002 por nginx, en 8080):
+docker compose --profile storage up -d central-api minio minio-init
+docker compose --profile storage run --rm --no-deps \
+  -e WH001_API_URL=http://host.docker.internal:8101 \
+  -e WH002_API_URL=http://host.docker.internal:8080 \
+  -e WH003_API_URL=http://host.docker.internal:8103 \
+  batch python -m batch.daily_report --date 2026-11-25
+```
+
+El Compose raíz solo tiene la bodega WH-001; mientras `WH002_API_URL` y `WH003_API_URL` no estén configuradas, esas bodegas cuentan como faltantes y el reporte sale `PARTIAL`.
+
+### Evidencia
+
+Pruebas: `tests/unit/test_daily_report.py` (12) y `tests/integration/fase1/test_batch_read_endpoints.py` (13, contando los parámetros) pasan; el CI las ejecuta.
+
+**Criterio 1 — dos ejecuciones de la misma fecha:** mismos objetos y dos filas en `batch_runs`.
+
+```text
+$ mc ls --recursive local/warehouse-platform
+[2026-11-25 19:01:56 UTC]   888B STANDARD reports/daily/2026-11-25/summary.json
+[2026-11-25 19:01:56 UTC] 2.0KiB STANDARD warehouses/WH-001/2026/11/inventory-2026-11-25.json
+[2026-11-25 19:01:56 UTC] 2.0KiB STANDARD warehouses/WH-002/2026/11/inventory-2026-11-25.json
+[2026-11-25 19:01:56 UTC] 2.0KiB STANDARD warehouses/WH-003/2026/11/inventory-2026-11-25.json
+
+$ mc stat local/warehouse-platform/reports/daily/2026-11-25/summary.json
+Metadata  :
+  X-Amz-Meta-Correlation-Id: COR-20261125-5e8623dc
+
+central=# SELECT run_id, report_date, status, jsonb_array_length(objects) AS objetos FROM batch_runs;
+                run_id                | report_date |  status   | objetos
+--------------------------------------+-------------+-----------+---------
+ 3e442227-b40a-4524-b1a8-83977f719233 | 2026-11-25  | SUCCEEDED |       4
+ 8758fc09-a4ff-487e-8306-5af1c421ba03 | 2026-11-25  | SUCCEEDED |       4
+```
+
+**Criterio 2 — una bodega caída:** con `wh002_api` detenida, el batch deja `PARTIAL`, no escribe la foto de WH-002 y registra la ejecución.
+
+```text
+{"level": "ERROR", "event": "warehouse_unavailable", "error": "HTTP Error 504: Gateway Time-out"}
+status= PARTIAL missing= ['WH-002'] WH-002= {'status': 'MISSING'}
+
+ report_date |  status   | objetos
+-------------+-----------+---------
+ 2026-11-25  | PARTIAL   |       3
+```
+
+**Ejemplo de `reports/daily/2026-11-25/summary.json`** (abreviado):
+
+```json
+{
+  "report_date": "2026-11-25",
+  "status": "SUCCEEDED",
+  "missing_warehouses": [],
+  "movements_by_type_and_warehouse": {
+    "WH-001": {"RECEIPT": 11, "SHIPMENT": 1},
+    "WH-002": {"RECEIPT": 11},
+    "WH-003": {"RECEIPT": 11, "SHIPMENT": 1}
+  },
+  "net_change_by_sku": {"P-001": 192, "P-002": 260, "...": "..."},
+  "top_5_skus": [
+    {"sku": "P-004", "units_moved": 340, "movements": 3},
+    {"sku": "P-007", "units_moved": 325, "movements": 3}
+  ],
+  "warehouses": {"WH-001": {"status": "OK", "inventory_rows": 10, "movements": 12}}
+}
+```
+
+### Preguntas del profesor
+
+Las cuatro preguntas de diseño y sus respuestas base se tomaron de `docs/fases/fase-8.md` del PR #52; hay que confirmar que son las del enunciado.
+
+**¿Por qué procesar fuera del request?** Para no bloquear las operaciones de inventario con reportes grandes y para poder reintentar: el batch es una ejecución aparte, y repetir un día reemplaza los mismos objetos.
+
+**¿Cuándo usar Batch?** En agregaciones periódicas y cargas por lotes, como este reporte diario.
+
+**¿Cuándo usar un worker?** En el procesamiento continuo de mensajes.
+
+**¿Cuándo usar Lambda?** En validaciones cortas disparadas por eventos.
+
+### Pendiente
+
+- El punto 6 del issue #12 (mover el resultado de `POST /reports` a `reports/jobs/<job_id>.json`) depende de D-04 (#18), que todavía no está en `main`: no existe `POST /reports` ni el worker de reportes. No se implementó.
+- El cambio neto por SKU no conoce los tipos de movimiento de la Saga (`RESERVATION`, `TRANSFER_*`); ver las consecuencias del ADR-0014.
