@@ -1,0 +1,71 @@
+S-04 - Experimento de balanceo y caida de replica 2026-11-26T15:46:17Z
+Proyecto s04, perfil lb; nginx en el puerto de host 28202 (WH002_LB_PORT; por defecto 8002).
+
+$ docker compose ps (replicas y balanceador)
+SERVICE                           STATUS                         PORTS
+wh002_api                         Up About a minute (healthy)    8000/tcp
+wh002_api_1                       Up About a minute (healthy)    8000/tcp
+wh002_api_2                       Up About a minute (healthy)    8000/tcp
+wh002_api_3                       Up About a minute (healthy)    8000/tcp
+wh002_lb                          Up 50 seconds                  127.0.0.1:28202->80/tcp
+
+$ 9 peticiones: X-Instance y X-Upstream (round robin)
+HTTP/1.1 200 OK x-instance: wh002-api-3 X-Upstream: 172.28.0.5:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-1 X-Upstream: 172.28.0.8:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-2 X-Upstream: 172.28.0.4:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-3 X-Upstream: 172.28.0.5:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-1 X-Upstream: 172.28.0.8:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-2 X-Upstream: 172.28.0.4:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-3 X-Upstream: 172.28.0.5:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-1 X-Upstream: 172.28.0.8:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-2 X-Upstream: 172.28.0.4:8000 
+
+$ docker compose stop wh002_api_2   (en plena carga)
+ Container s04-wh002_api_2-1 Stopped 
+
+$ codigos HTTP de 40 peticiones durante la caida (1 cada 250 ms)
+  40 200
+
+$ 9 peticiones con wh002_api_2 apagada (solo 1 y 3)
+HTTP/1.1 200 OK x-instance: wh002-api-3 X-Upstream: 172.28.0.5:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-1 X-Upstream: 172.28.0.8:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-3 X-Upstream: 172.28.0.5:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-1 X-Upstream: 172.28.0.8:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-3 X-Upstream: 172.28.0.5:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-1 X-Upstream: 172.28.0.8:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-3 X-Upstream: 172.28.0.5:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-1 X-Upstream: 172.28.0.8:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-3 X-Upstream: 172.28.0.5:8000 
+
+$ docker compose ps (wh002_api_2 detenida)
+SERVICE                           STATUS
+wh002_api_1                       Up About a minute (healthy)
+wh002_api_2                       Exited (0) 9 seconds ago
+wh002_api_3                       Up About a minute (healthy)
+
+$ docker compose logs wh002_lb: lineas con reintento (upstream_addr con coma) o error
+{"time":"2026-11-26T15:46:22+00:00","method":"GET","uri":"/inventory/P-001","status":200,"request_time":1.005,"upstream_addr":"172.28.0.4:8000, 172.28.0.5:8000","upstream_status":"504, 200","upstream_response_time":"1.001, 0.004","correlation_id":""}
+{"time":"2026-11-26T15:46:24+00:00","method":"GET","uri":"/inventory/P-001","status":200,"request_time":1.004,"upstream_addr":"172.28.0.4:8000, 172.28.0.5:8000","upstream_status":"504, 200","upstream_response_time":"1.001, 0.004","correlation_id":""}
+
+$ docker compose logs wh002_lb: ultimas 8 lineas (JSON)
+{"time":"2026-11-26T15:46:30+00:00","method":"GET","uri":"/inventory/P-001","status":200,"request_time":0.003,"upstream_addr":"172.28.0.8:8000","upstream_status":"200","upstream_response_time":"0.003","correlation_id":""}
+{"time":"2026-11-26T15:46:30+00:00","method":"GET","uri":"/inventory/P-001","status":200,"request_time":0.002,"upstream_addr":"172.28.0.5:8000","upstream_status":"200","upstream_response_time":"0.001","correlation_id":""}
+{"time":"2026-11-26T15:46:30+00:00","method":"GET","uri":"/inventory/P-001","status":200,"request_time":0.001,"upstream_addr":"172.28.0.8:8000","upstream_status":"200","upstream_response_time":"0.001","correlation_id":""}
+{"time":"2026-11-26T15:46:30+00:00","method":"GET","uri":"/inventory/P-001","status":200,"request_time":0.002,"upstream_addr":"172.28.0.5:8000","upstream_status":"200","upstream_response_time":"0.002","correlation_id":""}
+{"time":"2026-11-26T15:46:30+00:00","method":"GET","uri":"/inventory/P-001","status":200,"request_time":0.001,"upstream_addr":"172.28.0.8:8000","upstream_status":"200","upstream_response_time":"0.001","correlation_id":""}
+{"time":"2026-11-26T15:46:30+00:00","method":"GET","uri":"/inventory/P-001","status":200,"request_time":0.001,"upstream_addr":"172.28.0.5:8000","upstream_status":"200","upstream_response_time":"0.001","correlation_id":""}
+{"time":"2026-11-26T15:46:30+00:00","method":"GET","uri":"/inventory/P-001","status":200,"request_time":0.001,"upstream_addr":"172.28.0.8:8000","upstream_status":"200","upstream_response_time":"0.001","correlation_id":""}
+{"time":"2026-11-26T15:46:30+00:00","method":"GET","uri":"/inventory/P-001","status":200,"request_time":0.001,"upstream_addr":"172.28.0.5:8000","upstream_status":"200","upstream_response_time":"0.001","correlation_id":""}
+
+$ docker compose start wh002_api_2 (recuperacion)
+ Container s04-wh002_api_2-1 Started 
+SERVICE                           STATUS
+wh002_api_1                       Up About a minute (healthy)
+wh002_api_2                       Up 25 seconds (healthy)
+wh002_api_3                       Up About a minute (healthy)
+HTTP/1.1 200 OK x-instance: wh002-api-1 X-Upstream: 172.28.0.8:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-3 X-Upstream: 172.28.0.5:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-2 X-Upstream: 172.28.0.4:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-1 X-Upstream: 172.28.0.8:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-3 X-Upstream: 172.28.0.5:8000 
+HTTP/1.1 200 OK x-instance: wh002-api-2 X-Upstream: 172.28.0.4:8000 

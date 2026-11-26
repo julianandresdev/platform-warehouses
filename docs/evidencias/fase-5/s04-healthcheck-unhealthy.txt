@@ -1,0 +1,33 @@
+S-04 - Healthcheck de Docker: replica unhealthy 2026-11-26T15:48:36Z
+
+$ docker kill --signal=STOP s04-wh002_api_3-1   (congela uvicorn: /health deja de responder)
+s04-wh002_api_3-1
+
+$ docker compose ps (a los ~30 s)
+SERVICE                           STATUS
+wh002_api_1                       Up 3 minutes (healthy)
+wh002_api_2                       Up 2 minutes (healthy)
+wh002_api_3                       Up 3 minutes (healthy)
+
+$ docker compose ps (a los ~60 s)
+SERVICE                           STATUS
+wh002_api_1                       Up 4 minutes (healthy)
+wh002_api_2                       Up 3 minutes (healthy)
+wh002_api_3                       Up 4 minutes (unhealthy)
+
+$ docker compose ps (a los ~90 s)
+SERVICE                           STATUS
+wh002_api_1                       Up 4 minutes (healthy)
+wh002_api_2                       Up 3 minutes (healthy)
+wh002_api_3                       Up 4 minutes (unhealthy)
+
+$ docker kill --signal=CONT s04-wh002_api_3-1
+s04-wh002_api_3-1
+SERVICE                           STATUS
+wh002_api_1                       Up 5 minutes (healthy)
+wh002_api_2                       Up 4 minutes (healthy)
+wh002_api_3                       Up 5 minutes (healthy)
+
+$ errores de nginx durante el experimento anterior (error_log)
+2026/11/26 15:46:22 [error] 32#32: *37 upstream timed out (110: Operation timed out) while connecting to upstream, client: 172.28.0.1, server: , request: "GET /inventory/P-001 HTTP/1.1", upstream: "http://172.28.0.4:8000/inventory
+2026/11/26 15:46:24 [error] 32#32: *40 upstream timed out (110: Operation timed out) while connecting to upstream, client: 172.28.0.1, server: , request: "GET /inventory/P-001 HTTP/1.1", upstream: "http://172.28.0.4:8000/inventory

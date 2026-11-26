@@ -10,6 +10,7 @@
 #   make logs s=wh002_api STACK=multi
 #   make load STACK=multi WH=2 USERS=100 TIME=1m
 #   make up STACK=multi PROFILES="obs"   (perfiles extra; ver docs/fases/fase-4.md)
+#   make up STACK=multi PROFILES="lb"    (3 réplicas de WH-002 detrás de nginx en el 8002; ver fase-5.md)
 .PHONY: up down logs reset-db ps test load up-multi down-multi ps-multi logs-multi reset-db-multi
 
 STACK ?= single
