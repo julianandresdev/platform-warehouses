@@ -1,0 +1,12 @@
+Caso 2: Outbox conserva publicaciones cuando RabbitMQ está caído
+Fecha UTC: 2026-11-26T04:41:26Z
+Rama: test/D-06-chaos
+OK: API WH-001 lista
+OK: API central lista
+Movimiento: {"id":11,"sku":"P-001","product_id":1,"warehouse_id":"WH-001","type":"RECEIPT","quantity":1,"reference":"d06-caso-2-20261126T044154Z-2114","created_at":"2026-11-26T04:41:55.987483"}
+OK: evento guardado en outbox pendiente
+Outbox pendiente: 1
+OK: RabbitMQ saludable
+OK: outbox publicado tras recuperar RabbitMQ
+Outbox publicado: 1
+Exit code: 0

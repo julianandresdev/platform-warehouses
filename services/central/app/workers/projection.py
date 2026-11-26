@@ -1,9 +1,10 @@
 """Proyeccion CQRS de inventario y heartbeats."""
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, ValidationError, model_validator
 from sqlalchemy import text
 
 from common.events import EventEnvelope
+from common.rabbit import PermanentError
 from app.domain.database import SessionLocal
 
 
@@ -28,17 +29,23 @@ class HeartbeatPayload(BaseModel):
 def process_event(message: dict):
     """Procesa un evento y confirma sus cambios en PostgreSQL."""
 
-    event = EventEnvelope.model_validate(message)
+    try:
+        event = EventEnvelope.model_validate(message)
+    except ValidationError as exc:
+        raise PermanentError(f"Sobre inválido: {exc}") from exc
 
     if event.event_version != 1:
-        raise ValueError("Version de evento no soportada")
+        raise PermanentError("Versión de evento no soportada")
 
-    if event.event_type == "INVENTORY_UPDATED":
-        data = InventoryPayload.model_validate(event.payload)
-    elif event.event_type == "WAREHOUSE_HEARTBEAT":
-        data = HeartbeatPayload.model_validate(event.payload)
-    else:
-        raise ValueError("Tipo de evento no soportado")
+    try:
+        if event.event_type == "INVENTORY_UPDATED":
+            data = InventoryPayload.model_validate(event.payload)
+        elif event.event_type == "WAREHOUSE_HEARTBEAT":
+            data = HeartbeatPayload.model_validate(event.payload)
+        else:
+            raise PermanentError("Tipo de evento no soportado")
+    except ValidationError as exc:
+        raise PermanentError(f"Payload inválido: {exc}") from exc
 
     # La transaccion incluye idempotencia y proyeccion.
     with SessionLocal.begin() as db:

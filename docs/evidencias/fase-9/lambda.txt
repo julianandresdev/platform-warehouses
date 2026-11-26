@@ -1,0 +1,12 @@
+{
+    "Nombre": "warehouse-platform-export-handler",
+    "Runtime": "python3.12",
+    "Handler": "handler.lambda_handler",
+    "Memoria": 128,
+    "Timeout": 30,
+    "VariablesDeEntorno": [
+        "EVENT_BUS_NAME",
+        "CENTRAL_API_KEY",
+        "CENTRAL_API_URL"
+    ]
+}

@@ -1,0 +1,29 @@
+name: Fase 10 - Escenarios de caos
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chaos-scenarios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run five failure and recovery scenarios
+        run: bash tests/chaos/run-all.sh
+
+      - name: Upload scenario evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fase-10-chaos-evidence
+          path: docs/evidencias/fase-10/caso-*.txt
+          if-no-files-found: warn

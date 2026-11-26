@@ -1,3 +1,8 @@
+variable "region" {
+  type        = string
+  description = "Region donde se crea el bucket"
+}
+
 variable "project_prefix" {
   type        = string
   description = "Prefijo del proyecto (solo para las etiquetas)"

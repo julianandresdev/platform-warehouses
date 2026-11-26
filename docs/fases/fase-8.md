@@ -122,7 +122,29 @@ Las cuatro preguntas de diseño y sus respuestas base se tomaron de `docs/fases/
 
 **¿Cuándo usar Lambda?** En validaciones cortas disparadas por eventos.
 
+### Punto 6 — resultado de `POST /reports` en `reports/jobs/<job_id>.json`
+
+Con D-04 en `main` (#66), el worker de reportes de cada bodega escribe el resultado también en el bucket, con `common/storage.py` y el metadato `correlation-id` del evento `REPORT_REQUESTED`. Se activa con `REPORTS_TO_S3=true` (por defecto está apagado, así que `docker compose up` sin el profile `storage` no cambia). La fila de `report_jobs` conserva `status` y `result`, y `result` añade `object_key`; así `GET /reports/jobs/{id}` sigue respondiendo igual que en D-04. Si la escritura en el bucket falla, el trabajo queda `FAILED` con el error.
+
+```bash
+REPORTS_TO_S3=true docker compose --profile storage up -d db rabbitmq rabbitmq-topology api reports-worker outbox-worker minio minio-init
+curl -X POST localhost:8000/reports -H "X-API-Key: $API_KEY" -H 'Content-Type: application/json' \
+  -H 'X-Correlation-ID: COR-J08-PT6' -d '{"start_at":"2026-11-01T00:00:00Z","end_at":"2026-12-01T00:00:00Z"}'
+```
+
+```text
+$ mc ls local/warehouse-platform/reports/jobs/
+[2026-11-26 03:54:47 UTC]   859B STANDARD a4a7165a-7e23-4cdb-807d-9db525b4c2b9.json
+
+$ mc stat ... a4a7165a-7e23-4cdb-807d-9db525b4c2b9.json
+  X-Amz-Meta-Correlation-Id: COR-J08-PT6
+
+GET /reports/jobs/a4a7165a-...  ->  DONE  result.object_key = reports/jobs/a4a7165a-7e23-4cdb-807d-9db525b4c2b9.json
+```
+
+Pruebas: `tests/unit/test_report_job_storage.py` (3): llave, metadato y reemplazo al repetir el mismo trabajo.
+
 ### Pendiente
 
-- El punto 6 del issue #12 (mover el resultado de `POST /reports` a `reports/jobs/<job_id>.json`) depende de D-04 (#18), que todavía no está en `main`: no existe `POST /reports` ni el worker de reportes. No se implementó.
 - El cambio neto por SKU no conoce los tipos de movimiento de la Saga (`RESERVATION`, `TRANSFER_*`); ver las consecuencias del ADR-0014.
+- Los reportes de `reports/jobs/` los valida la Lambda solo como objeto JSON; su formato no tiene esquema propio.

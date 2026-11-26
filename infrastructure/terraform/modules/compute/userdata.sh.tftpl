@@ -3,6 +3,22 @@
 set -euo pipefail
 exec > >(tee /var/log/warehouse-bootstrap.log) 2>&1
 
+# Sin acceso por SSH, el log del arranque y los de los contenedores se suben a S3 (<bucket>/logs/)
+# al terminar, con éxito o no, para poder diagnosticar un arranque fallido.
+%{ if bundle_s3_uri != "" ~}
+subir_logs() {
+  local destino="$(dirname '${bundle_s3_uri}')/logs" sello
+  sello=$(date +%Y%m%dT%H%M%S)
+  aws s3 cp /var/log/warehouse-bootstrap.log "$destino/bootstrap-$sello.log" --region '${region}' || true
+  if [ -f '${compose_dir}/docker-compose.yaml' ]; then
+    (cd '${compose_dir}' && docker compose ps -a > /tmp/compose-ps.txt 2>&1; docker compose logs --no-color --tail=200 > /tmp/compose-logs.txt 2>&1)
+    aws s3 cp /tmp/compose-ps.txt "$destino/compose-ps-$sello.txt" --region '${region}' || true
+    aws s3 cp /tmp/compose-logs.txt "$destino/compose-logs-$sello.txt" --region '${region}' || true
+  fi
+}
+trap subir_logs EXIT
+%{ endif ~}
+
 # 1. Docker y el plugin de Compose v2 (Amazon Linux 2023 trae Docker, no Compose).
 dnf install -y docker
 systemctl enable --now docker
@@ -25,6 +41,17 @@ cat > .env <<'ENVFILE'
 ${key}=${value}
 %{ endfor ~}
 ENVFILE
+umask 022
 
-# 4. Levantar la plataforma. Necesita un docker-compose.yaml en ${compose_dir}.
+# 4. Paquete de despliegue (docker-compose.yaml y sql/) desde S3, con el perfil de instancia.
+%{ if bundle_s3_uri != "" ~}
+aws s3 sync '${bundle_s3_uri}' '${compose_dir}/' --region '${region}'
+# Los contenedores (p. ej. el usuario postgres) leen estos archivos montados: el .env sigue en 600.
+find '${compose_dir}/sql' -type d -exec chmod 755 {} +
+find '${compose_dir}/sql' -type f -exec chmod 644 {} +
+chmod 644 '${compose_dir}/docker-compose.yaml' '${compose_dir}/init-rds.sh'
+%{ endif ~}
+
+# 5. Levantar la plataforma. Necesita un docker-compose.yaml en ${compose_dir}.
+cd '${compose_dir}'
 docker compose pull && docker compose up -d

@@ -47,9 +47,25 @@ Línea de log de la Lambda en esa prueba (el `correlation_id` sale del metadato 
 {"event": "report_validated", "correlation_id": "COR-20010101-s08test", "bucket": "warehouse-platform", "object_key": "reports/daily/2001-01-01/summary.json", "status": "VALID", "reason": null, "size": 275, "sha256": "ac6cd9e5...b231b4", "record_count": 5, "metadata_key": "metadata/reports/daily/2001-01-01/summary.json"}
 ```
 
+### Prueba en AWS (S-09, 26 nov 2026)
+
+Con el despliegue de [aws.md](../aws.md): el batch subió `reports/daily/2026-11-26/summary.json` al bucket real con `correlation-id: COR-20261126-e8ddb6c4`; la Lambda escribió `metadata/reports/daily/2026-11-26/summary.json` (`VALID`, 33 registros, SHA-256), registró el reporte en la central con `POST /internal/reports` y dejó en CloudWatch el log `report_validated` con el mismo `correlation_id`. Evidencia: [`s3.txt`](../evidencias/fase-9/s3.txt), [`cloudwatch-lambda.txt`](../evidencias/fase-9/cloudwatch-lambda.txt) y [`lambda.txt`](../evidencias/fase-9/lambda.txt). Cerrar el criterio dependía del endpoint de la central, que llega con #73.
+
+### Worker, Batch y Lambda con datos propios
+
+| | Worker | Batch | Lambda |
+| --- | --- | --- | --- |
+| Qué lo dispara | Un mensaje en RabbitMQ (continuo) | Una ejecución manual o programada del reporte diario | Crear un objeto `reports/*.json` en S3 |
+| Estado entre usos | Siempre encendido (contenedor de la EC2) | Proceso nuevo en cada corrida | Se apaga solo; la primera invocación arranca en frío |
+| Arranque | Ninguno | Arranque del proceso | Frío: 329 ms de inicialización; caliente: ninguna |
+| Duración medida | Una transferencia completa por la Saga (tres comandos de bodega y los eventos) quedó `COMPLETED` en 4 s o menos | 5,8 s la segunda corrida (3 bodegas por API, 5 objetos a S3 y registro en la central), medida desde la laptop contra la EC2 | 3226 ms en frío (incluye la llamada a la central) y 429 ms en caliente |
+| Memoria | No medida en AWS | No medida | 93 MB de 128 MB |
+| Costo | Entra en el de la EC2 encendida (≈ USD 0,083 por hora en `t3.large`) | Solo mientras corre | ≈ USD 0,00001 por invocación fría (128 MB, 3,6 s facturados) |
+
+Los números de Lambda salen de las líneas `REPORT` de CloudWatch. El resto son mediciones únicas, sin repetición: sirven de orden de magnitud, no como promedio. El costo es un cálculo con precios de lista, no una medición.
+
 ### Pendiente
 
-- **Criterio de aceptación en AWS:** subir un reporte a S3 real y ver el metadato, el registro en la central y el log en CloudWatch con el correlation ID. No se hizo: requiere el Learner Lab y la central desplegada.
-- **`POST /internal/reports` no existe en la central** de `main` (solo está `POST /internal/batch-runs`) y ningún issue abierto lo asigna. El contrato de arriba sale de la tabla `reports`; hay que acordarlo con quien implemente el endpoint.
-- **Tabla Worker / Batch / Lambda con datos propios** (arranque en frío de CloudWatch, duración, costo): requiere mediciones en AWS.
-- **Variables de entorno en Terraform:** el módulo `lambda` (S-06) hoy solo pasa `EVENT_BUS_NAME`; falta pasar `CENTRAL_API_URL` y `CENTRAL_API_KEY` cuando se despliegue.
+- **Variables de la Lambda:** ya se pasan desde Terraform (`CENTRAL_API_URL` y `CENTRAL_API_KEY`), con la IP elástica de la EC2.
+- El reporte de la prueba es `reports/daily/`; los de `reports/jobs/` (J-08, punto 6) no se probaron en AWS.
+- `CENTRAL_API_KEY` va como variable de entorno de la función (visible en la consola de Lambda); es aceptable solo en el laboratorio.

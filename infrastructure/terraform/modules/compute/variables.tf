@@ -57,3 +57,21 @@ variable "env_vars" {
   description = "Variables que se escriben en el .env de la EC2"
   sensitive   = true
 }
+
+variable "bundle_s3_uri" {
+  type        = string
+  description = "s3://<bucket>/<prefijo> con docker-compose.yaml y sql/ (lo sube scripts/aws-bundle.sh); vacío = no se descarga nada"
+  default     = ""
+}
+
+variable "associate_eip" {
+  type        = bool
+  description = "Asociar la IP elástica eip_allocation_id a la EC2 (así la Lambda conoce la URL de la central antes de crear la instancia)"
+  default     = false
+}
+
+variable "eip_allocation_id" {
+  type        = string
+  description = "Id de la IP elástica; solo se usa si associate_eip es true"
+  default     = ""
+}
