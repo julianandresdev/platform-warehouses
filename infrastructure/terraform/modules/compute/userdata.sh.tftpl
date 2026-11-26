@@ -1,0 +1,30 @@
+#!/bin/bash
+# Arranque de la EC2 de la plataforma (S-06). El log queda en /var/log/warehouse-bootstrap.log.
+set -euo pipefail
+exec > >(tee /var/log/warehouse-bootstrap.log) 2>&1
+
+# 1. Docker y el plugin de Compose v2 (Amazon Linux 2023 trae Docker, no Compose).
+dnf install -y docker
+systemctl enable --now docker
+usermod -aG docker ec2-user
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -fsSL "https://github.com/docker/compose/releases/download/${compose_version}/docker-compose-linux-$(uname -m)" \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+# 2. Login a ECR con el perfil de instancia (sin credenciales en el disco).
+aws ecr get-login-password --region '${region}' \
+  | docker login --username AWS --password-stdin '${ecr_registry}'
+
+# 3. .env generado por Terraform (contiene secretos: solo lectura para root).
+mkdir -p '${compose_dir}'
+cd '${compose_dir}'
+umask 077
+cat > .env <<'ENVFILE'
+%{ for key, value in env_vars ~}
+${key}=${value}
+%{ endfor ~}
+ENVFILE
+
+# 4. Levantar la plataforma. Necesita un docker-compose.yaml en ${compose_dir}.
+docker compose pull && docker compose up -d

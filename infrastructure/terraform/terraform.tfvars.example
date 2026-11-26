@@ -1,5 +1,17 @@
-aws_region = "us-east-1"
-bucket_name = "cambia-por-nombre-global-unico-123456789"
+aws_region     = "us-east-1"
+bucket_name    = "cambia-por-nombre-global-unico-123456789"
 project_prefix = "warehouse-platform"
+
 # SOLO para demos con datos descartables y destruir el bucket no vacío.
 force_destroy_bucket = false
+
+# IP pública del equipo (/32) para SSH (22), RabbitMQ (15672) y Grafana (3000).
+team_cidr_blocks = ["203.0.113.10/32"]
+
+# Puertos de las APIs que quedan abiertos a Internet durante la demo.
+public_api_ports = [8000]
+
+# Confirmar con S-01 qué tipos permite el Learner Lab.
+instance_type = "t3.large"
+
+# La clave de RDS no va en este archivo: exportar TF_VAR_db_password.
