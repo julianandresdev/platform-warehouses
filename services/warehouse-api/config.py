@@ -15,6 +15,10 @@ CACHE_TTL_SECONDS = int(os.getenv("CACHE_TTL_SECONDS", "30"))
 REDIS_TIMEOUT_SECONDS = float(os.getenv("REDIS_TIMEOUT_SECONDS", "0.2"))
 CACHE_INVALIDATION = os.getenv("CACHE_INVALIDATION", "sync").strip().lower()
 
+# Reportes asíncronos (D-04): con REPORTS_TO_S3=true el worker también escribe el
+# resultado en reports/jobs/<job_id>.json (J-08, punto 6) con common.storage.
+REPORTS_TO_S3 = os.getenv("REPORTS_TO_S3", "false").strip().lower() == "true"
+
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 # Clave que el cliente envía en el header X-API-Key. Sin ella la API no arranca.
