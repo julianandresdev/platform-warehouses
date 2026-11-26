@@ -11,10 +11,12 @@ tres intentos de upstream.
 
 ## Revisión de S-04
 
-La [prueba con una réplica apagada](../evidencias/fase-5/tolerancia-fallos.txt)
-registra 20 de 20 respuestas de `GET /health` y la recuperación de las
-tres réplicas. Falta adjuntar las líneas de nginx que prueben que se
-retiró la réplica y repetir la caída bajo carga de aplicación.
+La [prueba inicial](../evidencias/fase-5/tolerancia-fallos.txt) registró
+20 de 20 respuestas de `GET /health` con una réplica apagada. La
+[prueba de caída bajo carga](../evidencias/fase-5/caida-replica-bajo-carga.md)
+extendió la verificación a `GET /products`. Se registraron 2.411
+respuestas HTTP 200 desde el inicio del apagado, sin errores para el
+cliente, y nginx dejó constancia de la retirada temporal de la réplica.
 
 El issue #25 especifica puerto 8002, `max_fails=2`, dos intentos,
 `proxy_connect_timeout=1s`, `X-Upstream`, `X-Instance` y logs JSON
