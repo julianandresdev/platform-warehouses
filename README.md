@@ -1,8 +1,38 @@
 # Warehouse Cloud Platform
 
-Backend de la primera fase de Warehouse Cloud Platform.
+Warehouse Cloud Platform administra inventario por bodega y consolida
+consultas en la API central. La API de cada bodega registra productos,
+inventario y movimientos en PostgreSQL.
 
-En este Sprint se implementó una API REST con FastAPI y PostgreSQL para administrar productos e inventario de una bodega.
+## Escenarios locales
+
+Para ejecutar la API de una bodega con el Compose raíz:
+
+```sh
+docker compose up -d --build
+```
+
+Para levantar las bodegas distribuidas, RabbitMQ y la API central:
+
+```sh
+docker compose -p warehouses-demo -f infrastructure/compose/compose.distributed.yml -f infrastructure/compose/compose.central.yml up -d --build
+```
+
+La API central escucha en `127.0.0.1:8004`, WH-002 se consulta
+mediante Nginx en `127.0.0.1:8080` y las API de WH-001 y WH-003
+escuchan en los puertos `8101` y `8103`. Usa las variables de
+Compose para las claves de la API y las credenciales del entorno.
+
+El perfil `load` de Compose central incluye Locust. El
+[Compose de Batch](infrastructure/compose/compose.batch.yml) incluye
+el flujo local de objetos con MinIO. Si ya tienes un entorno usando
+los mismos puertos, usa ese proyecto o detén sus servicios antes
+de iniciar otro.
+
+Ver [arquitectura](docs/architecture.md), [guion de demo](docs/demo.md),
+[decisiones de arquitectura](docs/adr/README.md) y
+[checklist de entrega](docs/checklist-entrega.md). Las funciones de
+Saga que están en revisión se validan desde la rama E-06.
 
 ## Tecnologías
 
