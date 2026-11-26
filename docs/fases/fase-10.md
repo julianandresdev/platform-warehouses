@@ -75,6 +75,19 @@ Su validación experimental queda pendiente de D-06.
   antes del fallo del 24 de noviembre.
 - Las pruebas manuales no sustituyen completamente D-06.
 
+## Matriz de errores para revisión
+
+Estas cuatro filas están identificadas en el plan de desarrollo.
+La matriz final de D-06 debe incorporar las cuatro filas adicionales
+del enunciado y comprobar la política de reintentos y DLQ de D-05.
+
+| Fallo | Respuesta y recuperación | Justificación y evidencia |
+| --- | --- | --- |
+| RabbitMQ no disponible al publicar | Confirmar el movimiento y el evento en PostgreSQL. El relay publica cuando vuelve el broker. | El outbox conserva el trabajo pendiente. [Pendiente](../evidencias/fase-10/rabbitmq-outbox-pendiente.txt) · [Publicado](../evidencias/fase-10/rabbitmq-outbox-publicado.txt) |
+| Destino de la Saga inaccesible | Mantener `DESTINATION_PENDING` después del envío. Completar cuando vuelva el consumidor o compensar si el destino devuelve un rechazo definitivo. | Cancelar ante un silencio puede duplicar unidades en tránsito. [Historial de la transferencia](../evidencias/fase-11/traza-transferencia-saga.json) |
+| Versión de evento desconocida | El plan la clasifica como error permanente y deriva el mensaje a DLQ con un diagnóstico. | Repetir el mismo mensaje no vuelve compatible su contrato. Pendiente de validación con D-05. |
+| Redis no disponible | Leer PostgreSQL y responder con `X-Cache: BYPASS`. Recuperar el uso de caché cuando Redis vuelve. | PostgreSQL conserva la fuente de verdad. [Durante la caída](../evidencias/fase-10/redis-durante-1.txt) · [Tras recuperar Redis](../evidencias/fase-10/redis-despues-1.txt) |
+
 ## Estado
 
 - [x] Cinco escenarios manuales ejecutados.
