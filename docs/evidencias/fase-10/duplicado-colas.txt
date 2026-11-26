@@ -1,0 +1,17 @@
+Timeout: 60.0 seconds ...
+Listing queues for vhost / ...
+name	messages_ready	messages_unacknowledged	consumers
+wh-001.cache-invalidation	4	0	0
+wh-002.cache-invalidation	3	0	0
+wh-001.commands	0	0	0
+central.projection	0	0	1
+wh-003.commands	0	0	0
+iot.storage	0	0	0
+wh-002.reports	0	0	0
+wh-003.cache-invalidation	0	0	0
+iot.alerts	0	0	0
+central.audit	156	0	0
+wh-001.reports	0	0	0
+central.transfer-orchestrator	0	0	1
+wh-002.commands	0	0	0
+wh-003.reports	0	0	0

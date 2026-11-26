@@ -1,0 +1,19 @@
+NAMES                     STATUS
+e07-wh001_db-1            Up 7 minutes (healthy)
+e07-wh003_db-1            Up 7 minutes (healthy)
+e07-wh002_db-1            Up 7 minutes (healthy)
+e07-nginx-1               Up 7 minutes
+e07-central-db-1          Up 8 minutes (healthy)
+e07-central-worker-1      Up 5 minutes
+e07-rabbitmq_topology-1   Exited (0) 5 minutes ago
+e07-wh001_worker-1        Up 7 minutes
+e07-wh003_worker-1        Up 7 minutes
+e07-wh002_worker-1        Up 7 minutes
+e07-central-api-1         Up 7 minutes
+e07-wh003_api-1           Up 3 minutes (healthy)
+e07-wh002_api-1           Up 7 minutes (healthy)
+e07-wh001_api-1           Up 7 minutes (healthy)
+e07-rabbitmq-1            Up 25 seconds (healthy)
+e07-wh002_redis-1         Up 7 minutes (healthy)
+e07-wh003_redis-1         Up 7 minutes (healthy)
+e07-wh001_redis-1         Up 2 minutes (healthy)
