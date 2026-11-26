@@ -23,6 +23,11 @@ mediante Nginx en `127.0.0.1:8080` y las API de WH-001 y WH-003
 escuchan en los puertos `8101` y `8103`. Usa las variables de
 Compose para las claves de la API y las credenciales del entorno.
 
+Con el Makefile: `make up STACK=multi`, `make ps STACK=multi`,
+`make logs STACK=multi s=wh002_api`, `make load STACK=multi WH=2` y
+`make test`. Los puertos del host se pueden cambiar con `WH001_PORT`,
+`WH003_PORT` y `NGINX_PORT`. Detalles en [fase 4](docs/fases/fase-4.md).
+
 El perfil `load` de Compose central incluye Locust. El
 [Compose de Batch](infrastructure/compose/compose.batch.yml) incluye
 el flujo local de objetos con MinIO. Si ya tienes un entorno usando

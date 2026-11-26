@@ -1,0 +1,33 @@
+DEMO DE AISLAMIENTO (S-03) 2026-11-26T15:40:40Z
+
+$ antes: las tres bodegas responden
+WH-001 -> HTTP 200
+WH-002 -> HTTP 200
+WH-003 -> HTTP 200
+
+$ docker compose stop wh002_api wh002_db   (equivalente a wh-002-api / wh-002-db)
+ Container s03-wh002_api-1 Stopped 
+ Container s03-wh002_db-1 Stopped 
+
+$ con WH-002 caida
+WH-001 -> HTTP 200
+WH-002 -> HTTP 504
+WH-003 -> HTTP 200
+
+$ docker compose ps (APIs y DB)
+SERVICE                           STATUS
+wh001_api                         Up About a minute (healthy)
+wh001_db                          Up About a minute (healthy)
+wh002_api                         Exited (0) 3 seconds ago
+wh002_db                          Exited (0) 3 seconds ago
+wh003_api                         Up About a minute (healthy)
+wh003_db                          Up About a minute (healthy)
+
+$ docker compose start wh002_db wh002_api
+ Container s03-wh002_db-1 Started 
+ Container s03-wh002_api-1 Started 
+
+$ despues: recuperacion
+WH-001 -> HTTP 200
+WH-002 -> HTTP 200
+WH-003 -> HTTP 200

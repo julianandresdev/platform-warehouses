@@ -2,6 +2,7 @@
 # docker compose -f infrastructure/compose/compose.distributed.yml up -d --build
 # Misma imagen de API para todas las bodegas. Las variables se obtienen del entorno.
 x-api: &api
+  mem_limit: 384m
   build:
     context: ../../services
     dockerfile: warehouse-api/Dockerfile
@@ -19,6 +20,7 @@ x-api: &api
     retries: 5
 
 x-outbox-worker: &outbox-worker
+  mem_limit: 192m
   build:
     context: ../../services
     dockerfile: warehouse-api/Dockerfile
@@ -30,12 +32,14 @@ x-outbox-worker: &outbox-worker
 
 # Worker de comandos de la Saga (F6): consume wh-00X.commands.
 x-commands-worker: &commands-worker
+  mem_limit: 192m
   build:
     context: ../../services
     dockerfile: warehouse-api/Dockerfile
   command: ["python", "-m", "workers.commands"]
 
 x-cache-invalidation-worker: &cache-invalidation-worker
+  mem_limit: 192m
   build:
     context: ../../services
     dockerfile: warehouse-api/Dockerfile
@@ -48,6 +52,7 @@ x-cache-invalidation-worker: &cache-invalidation-worker
   restart: unless-stopped
 
 x-reports-worker: &reports-worker
+  mem_limit: 192m
   build:
     context: ../../services
     dockerfile: warehouse-api/Dockerfile
@@ -64,6 +69,7 @@ x-db-env: &db-env
   TZ: UTC
 
 x-db: &db
+  mem_limit: 512m
   image: postgres:16-alpine
   environment: *db-env
   restart: unless-stopped
@@ -74,6 +80,7 @@ x-db: &db
     retries: 10
 
 x-redis: &redis
+  mem_limit: 64m
   image: redis:7-alpine
   restart: unless-stopped
   healthcheck:
@@ -85,9 +92,9 @@ x-redis: &redis
 services:
   wh001_db:
     <<: *db
+    env_file: [wh-001.env]
     environment:
       <<: *db-env
-      WAREHOUSE_ID: WH-001
     volumes:
       - wh001_pg:/var/lib/postgresql/data
       - ../sql/warehouse:/sql:ro
@@ -98,21 +105,20 @@ services:
     networks: [wh001]
   wh001_api:
     <<: *api
+    env_file: [wh-001.env]
     environment:
-      WAREHOUSE_ID: WH-001
-      API_KEY: ${API_KEY:-dev-api-key}
       DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh001_db:5432/platform
       REDIS_URL: redis://wh001_redis:6379/0
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-    ports: ["127.0.0.1:8101:8000"]
+    ports: ["127.0.0.1:${WH001_PORT:-8101}:8000"]
     depends_on:
       wh001_db: {condition: service_healthy}
       wh001_redis: {condition: service_healthy}
     networks: [wh001, messaging]
   wh001_worker:
     <<: *outbox-worker
+    env_file: [wh-001.env]
     environment:
-      WAREHOUSE_ID: WH-001
       DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh001_db:5432/platform
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -122,8 +128,8 @@ services:
     networks: [wh001, messaging]
   wh001_cache_invalidation_worker:
     <<: *cache-invalidation-worker
+    env_file: [wh-001.env]
     environment:
-      WAREHOUSE_ID: WH-001
       REDIS_URL: redis://wh001_redis:6379/0
       CACHE_ENABLED: ${CACHE_ENABLED:-true}
       CACHE_INVALIDATION: ${CACHE_INVALIDATION:-sync}
@@ -135,8 +141,8 @@ services:
     networks: [wh001, messaging]
   wh001_reports_worker:
     <<: *reports-worker
+    env_file: [wh-001.env]
     environment:
-      WAREHOUSE_ID: WH-001
       DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh001_db:5432/platform
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -147,8 +153,8 @@ services:
 
   wh001_commands:
     <<: *commands-worker
+    env_file: [wh-001.env]
     environment:
-      WAREHOUSE_ID: WH-001
       DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh001_db:5432/platform
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       REDIS_URL: redis://wh001_redis:6379/0
@@ -161,9 +167,9 @@ services:
 
   wh002_db:
     <<: *db
+    env_file: [wh-002.env]
     environment:
       <<: *db-env
-      WAREHOUSE_ID: WH-002
     volumes:
       - wh002_pg:/var/lib/postgresql/data
       - ../sql/warehouse:/sql:ro
@@ -174,9 +180,8 @@ services:
     networks: [wh002]
   wh002_api:
     <<: *api
+    env_file: [wh-002.env]
     environment:
-      WAREHOUSE_ID: WH-002
-      API_KEY: ${API_KEY:-dev-api-key}
       DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh002_db:5432/platform
       REDIS_URL: redis://wh002_redis:6379/0
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
@@ -187,8 +192,8 @@ services:
     networks: [wh002, messaging]
   wh002_worker:
     <<: *outbox-worker
+    env_file: [wh-002.env]
     environment:
-      WAREHOUSE_ID: WH-002
       DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh002_db:5432/platform
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -198,8 +203,8 @@ services:
     networks: [wh002, messaging]
   wh002_cache_invalidation_worker:
     <<: *cache-invalidation-worker
+    env_file: [wh-002.env]
     environment:
-      WAREHOUSE_ID: WH-002
       REDIS_URL: redis://wh002_redis:6379/0
       CACHE_ENABLED: ${CACHE_ENABLED:-true}
       CACHE_INVALIDATION: ${CACHE_INVALIDATION:-sync}
@@ -211,8 +216,8 @@ services:
     networks: [wh002, messaging]
   wh002_reports_worker:
     <<: *reports-worker
+    env_file: [wh-002.env]
     environment:
-      WAREHOUSE_ID: WH-002
       DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh002_db:5432/platform
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -223,8 +228,8 @@ services:
 
   wh002_commands:
     <<: *commands-worker
+    env_file: [wh-002.env]
     environment:
-      WAREHOUSE_ID: WH-002
       DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh002_db:5432/platform
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       REDIS_URL: redis://wh002_redis:6379/0
@@ -237,9 +242,9 @@ services:
 
   wh003_db:
     <<: *db
+    env_file: [wh-003.env]
     environment:
       <<: *db-env
-      WAREHOUSE_ID: WH-003
     volumes:
       - wh003_pg:/var/lib/postgresql/data
       - ../sql/warehouse:/sql:ro
@@ -250,21 +255,20 @@ services:
     networks: [wh003]
   wh003_api:
     <<: *api
+    env_file: [wh-003.env]
     environment:
-      WAREHOUSE_ID: WH-003
-      API_KEY: ${API_KEY:-dev-api-key}
       DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh003_db:5432/platform
       REDIS_URL: redis://wh003_redis:6379/0
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-    ports: ["127.0.0.1:8103:8000"]
+    ports: ["127.0.0.1:${WH003_PORT:-8103}:8000"]
     depends_on:
       wh003_db: {condition: service_healthy}
       wh003_redis: {condition: service_healthy}
     networks: [wh003, messaging]
   wh003_worker:
     <<: *outbox-worker
+    env_file: [wh-003.env]
     environment:
-      WAREHOUSE_ID: WH-003
       DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh003_db:5432/platform
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -274,8 +278,8 @@ services:
     networks: [wh003, messaging]
   wh003_cache_invalidation_worker:
     <<: *cache-invalidation-worker
+    env_file: [wh-003.env]
     environment:
-      WAREHOUSE_ID: WH-003
       REDIS_URL: redis://wh003_redis:6379/0
       CACHE_ENABLED: ${CACHE_ENABLED:-true}
       CACHE_INVALIDATION: ${CACHE_INVALIDATION:-sync}
@@ -287,8 +291,8 @@ services:
     networks: [wh003, messaging]
   wh003_reports_worker:
     <<: *reports-worker
+    env_file: [wh-003.env]
     environment:
-      WAREHOUSE_ID: WH-003
       DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh003_db:5432/platform
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -299,8 +303,8 @@ services:
 
   wh003_commands:
     <<: *commands-worker
+    env_file: [wh-003.env]
     environment:
-      WAREHOUSE_ID: WH-003
       DATABASE_URL: postgresql+psycopg2://admin:${DB_PASSWORD:-localdev}@wh003_db:5432/platform
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       REDIS_URL: redis://wh003_redis:6379/0
@@ -313,9 +317,10 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
+    mem_limit: 512m
     ports:
-      - "127.0.0.1:5672:5672"
-      - "127.0.0.1:15672:15672"
+      - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_MGMT_PORT:-15672}:15672"
     volumes: [rabbitmq_data:/var/lib/rabbitmq]
     networks: [messaging]
     healthcheck:
@@ -325,6 +330,7 @@ services:
       retries: 10
 
   rabbitmq_topology:
+    mem_limit: 128m
     build:
       context: ../../services
       dockerfile: warehouse-api/Dockerfile
@@ -333,11 +339,13 @@ services:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
     depends_on:
       rabbitmq: {condition: service_healthy}
+    networks: [messaging]
     restart: "no"
 
   nginx:
     image: nginx:1.27.5-alpine
-    ports: ["127.0.0.1:8080:80"]
+    mem_limit: 64m
+    ports: ["127.0.0.1:${NGINX_PORT:-8080}:80"]
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:

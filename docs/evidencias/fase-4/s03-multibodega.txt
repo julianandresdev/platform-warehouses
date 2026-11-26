@@ -1,0 +1,59 @@
+S-03 - Evidencia generada 2026-11-26T15:40:32Z
+Proyecto s03; puertos de host remapeados (WH001_PORT=28101, WH003_PORT=28103, NGINX_PORT=28002) para no chocar con otro stack local.
+
+$ docker compose ps (servicios principales)
+SERVICE                           STATUS                          PORTS
+nginx                             Up 55 seconds                   127.0.0.1:28002->80/tcp
+rabbitmq                          Up About a minute (healthy)     127.0.0.1:25672->5672/tcp, 127.0.0.1:25673->15672/tcp
+wh001_api                         Up About a minute (healthy)     127.0.0.1:28101->8000/tcp
+wh001_db                          Up About a minute (healthy)     5432/tcp
+wh001_redis                       Up About a minute (healthy)     6379/tcp
+wh002_api                         Up About a minute (healthy)     8000/tcp
+wh002_db                          Up About a minute (healthy)     5432/tcp
+wh002_redis                       Up About a minute (healthy)     6379/tcp
+wh003_api                         Up About a minute (healthy)     127.0.0.1:28103->8000/tcp
+wh003_db                          Up About a minute (healthy)     5432/tcp
+wh003_redis                       Up About a minute (healthy)     6379/tcp
+
+$ limites de memoria (mem_limit)
+nginx                              64 MiB
+rabbitmq                           512 MiB
+wh001_api                          384 MiB
+wh001_cache_invalidation_worker    192 MiB
+wh001_commands                     192 MiB
+wh001_db                           512 MiB
+wh001_redis                        64 MiB
+wh001_reports_worker               192 MiB
+wh001_worker                       192 MiB
+wh002_api                          384 MiB
+wh002_cache_invalidation_worker    192 MiB
+wh002_commands                     192 MiB
+wh002_db                           512 MiB
+wh002_redis                        64 MiB
+wh002_reports_worker               192 MiB
+wh002_worker                       192 MiB
+wh003_api                          384 MiB
+wh003_cache_invalidation_worker    192 MiB
+wh003_commands                     192 MiB
+wh003_db                           512 MiB
+wh003_redis                        64 MiB
+wh003_reports_worker               192 MiB
+wh003_worker                       192 MiB
+
+$ inventario P-001 en cada bodega (esperado WH-001=100, WH-002=20, WH-003=55)
+WH-001:
+{"id":1,"sku":"P-001","product_id":1,"warehouse_id":"WH-001","quantity":100,"reserved_quantity":0,"available_quantity":100,"version":1,"updated_at":"2026-11-26T15:39:22.214045"}
+WH-002:
+{"id":1,"sku":"P-001","product_id":1,"warehouse_id":"WH-002","quantity":20,"reserved_quantity":0,"available_quantity":20,"version":1,"updated_at":"2026-11-26T15:39:22.182773"}
+WH-003:
+{"id":1,"sku":"P-001","product_id":1,"warehouse_id":"WH-003","quantity":55,"reserved_quantity":0,"available_quantity":55,"version":1,"updated_at":"2026-11-26T15:39:21.582251"}
+
+$ catalogo: productos por bodega
+WH-001: 10
+WH-002: 10
+WH-003: 10
+
+$ bases sin puerto publicado
+wh001_db 5432/tcp
+wh002_db 5432/tcp
+wh003_db 5432/tcp
