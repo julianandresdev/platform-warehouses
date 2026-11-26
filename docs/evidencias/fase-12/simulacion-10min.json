@@ -1,0 +1,24 @@
+{
+  "started_at": "2026-11-26T05:30:24.846480+00:00",
+  "finished_at": "2026-11-26T05:40:24.836677+00:00",
+  "duration_seconds": 600.021,
+  "sensor_count": 100,
+  "warehouse_ids": [
+    "WH-001",
+    "WH-002",
+    "WH-003",
+    "WH-004",
+    "WH-005"
+  ],
+  "publish_interval_seconds": 2.0,
+  "generated_unique": 30000,
+  "mqtt_publish_acknowledged": 30606,
+  "intentional_duplicate_publishes": 606,
+  "buffered_at_outage_start": 4,
+  "buffer_remaining": 0,
+  "dup_rate": 0.02,
+  "reorder_rate": 0.05,
+  "simulated_outage_start_seconds": 60,
+  "simulated_outage_duration_seconds": 20,
+  "cycles": 300
+}

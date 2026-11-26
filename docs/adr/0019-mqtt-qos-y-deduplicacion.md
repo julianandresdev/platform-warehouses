@@ -2,7 +2,7 @@
 
 ## Estado
 
-Propuesto según el plan. David debe validar la implementación y las corridas de D-07.
+Aceptado para la implementación local de D-07. Los tests unitarios y la prueba corta validan el contrato; la corrida de diez minutos está registrada en `docs/evidencias/fase-12/`, aunque el conteo final mostró una diferencia que requiere seguimiento antes de afirmar que se cumple el balance de extremo a extremo.
 
 ## Contexto y alternativas
 

@@ -1,0 +1,16 @@
+{
+  "resultado": "no_cumple_balance",
+  "duracion_segundos": 600.021,
+  "sensores": 100,
+  "publicaciones_mqtt_confirmadas": 30606,
+  "lecturas_unicas_generadas": 30000,
+  "duplicados_intencionales_publicados": 606,
+  "lecturas_unicas_guardadas_observadas": 29784,
+  "duplicados_descartados_observados": 599,
+  "mensajes_procesados_observados": 30383,
+  "diferencia_publicaciones_vs_procesados": 223,
+  "huecos_de_secuencia_observados": 216,
+  "entregas_fuera_de_orden": 1412,
+  "alertas_emitidas": 81,
+  "nota": "Esta corrida precedió al ajuste max_queued_messages de Mosquitto. El muestreo al cierre no alcanzó el balance esperado dentro de la ventana. La corrida corta y una corrida diagnóstica de 180 s sí cerraron con balance exacto y cero huecos; una nueva corrida de diez minutos con el ajuste final se inició y se interrumpió antes de completarse."
+}

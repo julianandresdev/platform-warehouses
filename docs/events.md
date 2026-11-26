@@ -130,4 +130,4 @@ Los consumidores no deben asumir orden global entre colas. Para inventario, `ver
 
 ## Estado de aprobación
 
-El contrato se deriva del plan compartido. D-02 y D-03 implementaron la topología y el outbox; D-04 añade la invalidación asíncrona, auditoría y reportes. Retry/DLQ siguen en D-05.
+El contrato se deriva del plan compartido. D-02 y D-03 implementaron la topología y el outbox; D-04 añade la invalidación asíncrona, auditoría y reportes; D-05 implementa retry/DLQ. D-07 implementa el gateway y los workers de almacenamiento y alertas IoT descritos aquí. Las colas IoT se crean como topología durable junto con las colas de retry y DLQ.
