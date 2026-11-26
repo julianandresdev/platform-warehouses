@@ -9,10 +9,10 @@ y justificar las decisiones de escalabilidad.
 
 | Escenario | Estado |
 |---|---|
-| Redis ON/OFF | Resultados históricos F2 consolidados |
-| Una frente a tres réplicas | Resultados históricos F5 consolidados |
-| Carga desigual entre bodegas | Pendiente J-09 |
-| Carga progresiva | Pendiente J-09 |
+| Redis ON/OFF | Resultados históricos F2 consolidados; corrida J-09 en [evidencias/fase-11](../evidencias/fase-11/README.md) |
+| Una frente a tres réplicas | Resultados históricos F5 consolidados; corrida J-09 en [evidencias/fase-11](../evidencias/fase-11/README.md) |
+| Carga desigual entre bodegas (50/800/20) | Corrida J-09: [evidencias/fase-11](../evidencias/fase-11/README.md) |
+| Carga progresiva (100/500/1000/5000) | Corrida J-09: [evidencias/fase-11](../evidencias/fase-11/README.md); WH-002 se atasca entre 100 y 500 usuarios |
 
 ## Preguntas de análisis y defensa
 

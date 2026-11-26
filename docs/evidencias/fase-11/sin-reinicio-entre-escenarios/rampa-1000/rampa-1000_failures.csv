@@ -1,0 +1,3 @@
+Method,Name,Error,Occurrences
+GET,GET /products,HTTPError('502 Server Error: Bad Gateway for url: GET /products'),234602
+GET,GET /inventory/{sku},HTTPError('502 Server Error: Bad Gateway for url: GET /inventory/{sku}'),234327
