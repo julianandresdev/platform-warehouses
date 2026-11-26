@@ -42,7 +42,7 @@ import models
 from common.events import EventEnvelope, new_event
 from common.logging import configure_logging
 from common.outbox import add_event
-from common.rabbit import connect, consume, declare_topology
+from common.rabbit import PermanentError, connect, consume, declare_topology
 
 logger = logging.getLogger(__name__)
 MAX_BACKOFF_SECONDS = 30
@@ -597,6 +597,11 @@ def run_worker() -> None:
     queue = consumer_name(warehouse_id)
     failures = 0
 
+    def consume_command(message: dict[str, Any]) -> None:
+        outcome = handle_command(message)
+        if outcome.status == "invalid":
+            raise PermanentError("Comando inválido o dirigido a otra bodega")
+
     while True:
         connection = None
         try:
@@ -604,7 +609,7 @@ def run_worker() -> None:
             declare_topology(connection.channel(), warehouse_ids=(warehouse_id,))
             logger.info("commands_worker_started", extra={"queue": queue})
             failures = 0
-            consume(queue, lambda message: handle_command(message), connection=connection)
+            consume(queue, consume_command, connection=connection)
             return
         except KeyboardInterrupt:
             return

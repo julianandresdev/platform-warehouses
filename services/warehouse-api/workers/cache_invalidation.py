@@ -9,23 +9,28 @@ import time
 
 import cache
 import config
+from pydantic import ValidationError
+
 from common.events import EventEnvelope
 from common.logging import configure_logging
-from common.rabbit import connect, consume, declare_topology
+from common.rabbit import PermanentError, connect, consume, declare_topology
 
 logger = logging.getLogger(__name__)
 stop_event = threading.Event()
 
 
 def handle_invalidation(message: dict) -> None:
-    event = EventEnvelope.model_validate(message)
+    try:
+        event = EventEnvelope.model_validate(message)
+    except ValidationError as exc:
+        raise PermanentError(f"Sobre inválido: {exc}") from exc
     if event.event_type != "INVENTORY_UPDATED":
-        raise ValueError("El worker solo acepta INVENTORY_UPDATED")
+        raise PermanentError("El worker solo acepta INVENTORY_UPDATED")
 
     warehouse_id = event.payload.get("warehouse_id")
     sku = event.payload.get("sku")
     if warehouse_id != config.WAREHOUSE_ID or not isinstance(sku, str) or not sku:
-        raise ValueError("El evento no corresponde a esta bodega o no contiene SKU")
+        raise PermanentError("El evento no corresponde a esta bodega o no contiene SKU")
 
     cache.invalidate_inventory(sku, raise_on_error=True)
     logger.info(

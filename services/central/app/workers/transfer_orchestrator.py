@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import text
 
 from common.events import EventEnvelope
-from common.rabbit import connect, consume, declare_topology
+from common.rabbit import PermanentError, connect, consume, declare_topology
 
 from app import config
 from app.domain.database import SessionLocal
@@ -61,13 +61,15 @@ def process_transfer_event(message):
     payload = event.payload
 
     if event.event_version != 1:
-        raise ValueError("Version de evento no soportada")
+        raise PermanentError("Version de evento no soportada")
 
     if event_type not in SOURCE_EVENTS | DESTINATION_EVENTS:
-        logger.warning("saga_unknown_event")
-        return
+        raise PermanentError(f"Tipo de evento no soportado por la Saga: {event_type}")
 
-    transfer_id = str(UUID(payload["transfer_id"]))
+    try:
+        transfer_id = str(UUID(payload["transfer_id"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise PermanentError("El evento de Saga no contiene un transfer_id válido") from exc
 
     with SessionLocal.begin() as db:
 
@@ -105,7 +107,7 @@ def process_transfer_event(message):
             or type(payload.get("quantity")) is not int
             or payload["quantity"] != transfer["quantity"]
         ):
-            raise ValueError(
+            raise PermanentError(
                 "El evento no corresponde a la transferencia"
             )
 

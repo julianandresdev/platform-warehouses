@@ -8,6 +8,7 @@ import os
 import random
 import threading
 import time
+from copy import copy
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -21,6 +22,24 @@ logger = logging.getLogger(__name__)
 
 Envelope = Mapping[str, Any]
 MessageHandler = Callable[[dict[str, Any]], None]
+MAX_DELIVERY_ATTEMPTS = 3
+RETRY_TTL_MS = 5_000
+
+
+class TransientError(RuntimeError):
+    """Error temporal del que vale la pena volver a intentar el mensaje."""
+
+
+class PermanentError(ValueError):
+    """Mensaje inválido o no soportado que no debe reintentarse."""
+
+
+def retry_queue_name(queue: str) -> str:
+    return f"{queue}.retry"
+
+
+def dead_letter_queue_name(queue: str) -> str:
+    return f"{queue}.dlq"
 
 EXCHANGES: dict[str, str] = {
     "warehouse.events": "topic",
@@ -68,15 +87,19 @@ def _queue_specs(warehouse_ids: tuple[str, ...]) -> list[tuple[str, str, str]]:
     return specs
 
 
+def work_queue_names(
+    warehouse_ids: tuple[str, ...] = ("WH-001", "WH-002", "WH-003"),
+) -> tuple[str, ...]:
+    """Return the unique durable work queues in the shared topology."""
+
+    return tuple(dict.fromkeys(queue for queue, _, _ in _queue_specs(warehouse_ids)))
+
+
 def declare_topology(
     channel: BlockingChannel,
     warehouse_ids: tuple[str, ...] = ("WH-001", "WH-002", "WH-003"),
 ) -> None:
-    """Declare the durable exchanges, queues and bindings from docs/events.md.
-
-    Declarations are idempotent. Retry queues and DLQ bindings are completed
-    in D-05; until then failed handler deliveries are requeued by ``consume``.
-    """
+    """Declare the durable exchanges, work queues, retry queues and DLQs."""
 
     channel.exchange_declare(exchange="dlx", exchange_type="direct", durable=True)
     for exchange, exchange_type in EXCHANGES.items():
@@ -92,8 +115,25 @@ def declare_topology(
                 durable=True,
                 arguments={"x-dead-letter-exchange": "dlx"},
             )
+            declare_retry_queues(channel, queue)
             seen_queues.add(queue)
         channel.queue_bind(queue=queue, exchange=exchange, routing_key=binding_key)
+
+
+def declare_retry_queues(channel: BlockingChannel, queue: str) -> None:
+    """Declare a queue's fixed-delay retry path and durable dead-letter queue."""
+
+    channel.queue_declare(
+        queue=retry_queue_name(queue),
+        durable=True,
+        arguments={
+            "x-message-ttl": RETRY_TTL_MS,
+            # The default exchange routes by queue name after the TTL expires.
+            "x-dead-letter-exchange": "",
+            "x-dead-letter-routing-key": queue,
+        },
+    )
+    channel.queue_declare(queue=dead_letter_queue_name(queue), durable=True)
 
 
 def connect(
@@ -185,7 +225,7 @@ def publish(
             correlation_id=data["correlation_id"],
             content_type="application/json",
             delivery_mode=2,
-            headers={"x-attempt": attempt},
+            headers={"x-attempt": max(0, int(attempt))},
         )
         try:
             confirmed = active_channel.basic_publish(
@@ -213,21 +253,18 @@ def consume(
     prefetch_count: int = 10,
     stop_event: threading.Event | None = None,
 ) -> None:
-    """Consume until stopped; ack only after handler returns successfully.
-
-    Handler exceptions are nacked and requeued. D-05 will replace this basic
-    policy with transient/permanent classification, retries and a DLQ.
-    """
+    """Consume with bounded retries; ack only after processing or safe reroute."""
 
     owns_connection = connection is None
     active_connection = connection or connect(url)
     channel = active_connection.channel()
     try:
+        declare_retry_queues(channel, queue)
         channel.basic_qos(prefetch_count=prefetch_count)
         channel.basic_consume(
             queue=queue,
             on_message_callback=lambda ch, method, properties, body: _deliver(
-                ch, method, properties, body, handler
+                ch, method, properties, body, handler, queue
             ),
             auto_ack=False,
         )
@@ -252,26 +289,112 @@ def _deliver(
     properties: pika.BasicProperties,
     body: bytes,
     handler: MessageHandler,
+    queue: str,
 ) -> None:
-    """Decode, set the message correlation context, then ack or requeue."""
+    """Decode and handle one delivery, routing failures safely before ack."""
 
     token = None
     try:
         message = json.loads(body)
         if not isinstance(message, dict):
-            raise ValueError("El sobre debe ser un objeto JSON")
+            raise PermanentError("El sobre debe ser un objeto JSON")
         correlation_id = message.get("correlation_id") or properties.correlation_id
         token = set_correlation_id(correlation_id)
         handler(message)
-    except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
-        logger.exception("rabbit_invalid_message", extra={"queue": method.routing_key})
-        channel.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        _route_failure(
+            channel,
+            method,
+            properties,
+            body,
+            queue,
+            PermanentError(f"JSON inválido: {exc}"),
+        )
         return
-    except Exception:
-        logger.exception("rabbit_handler_failed", extra={"queue": method.routing_key})
-        channel.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+    except PermanentError as exc:
+        _route_failure(channel, method, properties, body, queue, exc)
+        return
+    except Exception as exc:
+        _route_failure(channel, method, properties, body, queue, exc)
         return
     finally:
         if token is not None:
             reset_correlation_id(token)
     channel.basic_ack(delivery_tag=method.delivery_tag)
+
+
+def _route_failure(
+    channel: BlockingChannel,
+    method: pika.spec.Basic.Deliver,
+    properties: pika.BasicProperties,
+    body: bytes,
+    queue: str,
+    error: Exception,
+) -> None:
+    """Publish to retry/DLQ with confirms, then ack the original delivery."""
+
+    headers = dict(properties.headers or {})
+    try:
+        attempt = max(0, int(headers.get("x-attempt", 0)))
+    except (TypeError, ValueError):
+        attempt = 0
+
+    permanent = isinstance(error, PermanentError)
+    exhausted = attempt >= MAX_DELIVERY_ATTEMPTS - 1
+    to_dlq = permanent or exhausted
+    target = dead_letter_queue_name(queue) if to_dlq else retry_queue_name(queue)
+
+    if to_dlq:
+        headers["x-error"] = f"{type(error).__name__}: {error}"[:1_000]
+    else:
+        headers["x-attempt"] = attempt + 1
+        headers.pop("x-error", None)
+
+    try:
+        _publish_raw_to_queue(channel, target, body, properties, headers)
+    except Exception:
+        logger.exception(
+            "rabbit_failure_route_failed",
+            extra={"queue": queue, "target": target, "message_id": properties.message_id},
+        )
+        channel.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+        return
+
+    logger.warning(
+        "rabbit_message_dead_lettered" if to_dlq else "rabbit_message_retry_scheduled",
+        extra={
+            "queue": queue,
+            "target": target,
+            "attempt": attempt,
+            "error": f"{type(error).__name__}: {error}",
+            "message_id": properties.message_id,
+        },
+    )
+    channel.basic_ack(delivery_tag=method.delivery_tag)
+
+
+def _publish_raw_to_queue(
+    channel: BlockingChannel,
+    queue: str,
+    body: bytes,
+    properties: pika.BasicProperties,
+    headers: dict[str, Any],
+) -> None:
+    """Republish raw JSON to a durable queue and wait for broker confirmation."""
+
+    if not getattr(channel, "_warehouse_publisher_confirms", False):
+        channel.confirm_delivery()
+        channel._warehouse_publisher_confirms = True
+    cloned_properties = copy(properties)
+    cloned_properties.headers = headers
+    cloned_properties.delivery_mode = 2
+    cloned_properties.expiration = None
+    confirmed = channel.basic_publish(
+        exchange="",
+        routing_key=queue,
+        body=body,
+        properties=cloned_properties,
+        mandatory=True,
+    )
+    if confirmed is False:
+        raise RuntimeError("RabbitMQ no confirmó el reencaminamiento")
