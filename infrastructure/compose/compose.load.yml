@@ -1,0 +1,25 @@
+# Ajustes para las pruebas de carga (J-09). Se suma a los otros Compose:
+#   CACHE_ENABLED=false docker compose -p warehouses-demo \
+#     -f infrastructure/compose/compose.distributed.yml \
+#     -f infrastructure/compose/compose.central.yml \
+#     -f infrastructure/compose/compose.obs.yml \
+#     -f infrastructure/compose/compose.load.yml --profile obs up -d wh001_api
+# Permite apagar la caché de WH-001 (escenario Redis OFF) sin tocar el Compose de las bodegas.
+services:
+  # PostgreSQL de WH-002 con más conexiones. Con 3 réplicas de la API, cada una puede abrir
+  # DB_POOL_SIZE + DB_MAX_OVERFLOW = 40 conexiones (120 en total) y el valor por defecto de
+  # PostgreSQL es 100: bajo carga alta la base responde "too many clients already"
+  # (se vio en la primera tanda de J-09).
+  wh002_db:
+    command: ["postgres", "-c", "max_connections=200"]
+
+  wh001_api:
+    environment:
+      CACHE_ENABLED: ${CACHE_ENABLED:-true}
+
+  # Solo para las capturas headless de J-09: Grafana con acceso anónimo de solo lectura
+  # (el puerto 3000 se publica únicamente en 127.0.0.1).
+  grafana:
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer

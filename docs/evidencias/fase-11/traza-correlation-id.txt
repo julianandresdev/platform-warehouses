@@ -1,0 +1,8 @@
+$ docker compose logs --no-color | grep COR-J09-DEMO | cut -d"|" -f2- | jq -c "{service, event, status}"
+{"service":"warehouse-commands","event":"command_processed","status":null}
+{"service":"central-worker","event":"saga_transition_completed","status":"SOURCE_RESERVED"}
+{"service":"central-worker","event":"saga_transition_completed","status":"DESTINATION_PENDING"}
+{"service":"central-worker","event":"saga_transition_completed","status":"COMPLETED"}
+{"service":"central-api","event":"request","status":202}
+{"service":"warehouse-commands","event":"command_processed","status":null}
+{"service":"warehouse-commands","event":"command_processed","status":null}
