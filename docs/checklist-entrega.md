@@ -43,21 +43,23 @@ Estado: Pendiente de integracion y validacion final.
 - [ ] Revisar los borradores de ADR con sus responsables.
 - [x] Índice actualizado al tema real del ADR-0004 (concurrencia).
 - [x] Idempotencia de comandos identificada como ADR-0020.
-- [ ] Conciliar el contrato de lectura de Batch en ADR-0014.
+- [x] Contrato de lectura por API verificado en ADR-0014 y en el batch diario.
 - [ ] Documentar las fases 1 a 12 con evidencias.
 - [x] Preparar 33 respuestas de ensayo para revisión.
 - [ ] Validar las respuestas de cada bloque con sus responsables.
-- [ ] Contrastar las preguntas con el enunciado original.
+- [x] Cotejar las 33 preguntas con la sección 33 del enunciado y alinear la guía de ensayo.
 - [x] README principal actualizado con ejecución, perfil de carga y enlaces de demo.
 
 ## Integracion pendiente
 
-- [ ] E-01: integracion de documentacion.
+- [x] E-01: documentación integrada en main (PR #57).
 - [x] E-04: proyección CQRS integrada en main (PR #54).
 - [x] E-05: fan-out integrado en main a través de E-04 (PR #55 y #54).
-- [ ] E-06: Saga e integracion con J-07.
-- [ ] E-07: informe final y pruebas de resiliencia.
-- [ ] E-08: revision de arquitectura y defensa.
+- [x] E-06: Saga y worker de bodega integrados en main (PR #56 y #59).
+- [x] E-07: informe consolidado con las evidencias de D-06 y J-09.
+- [ ] Revisión final del informe E-07 por Julian.
+- [x] E-08: arquitectura y guía de defensa integradas en main (PR #61).
+- [ ] Revisión grupal de arquitectura y defensa.
 - [ ] Verificar CI y aprobaciones correspondientes.
 
 ## Ensayo de la defensa
@@ -86,7 +88,7 @@ bloque diferente al de su responsabilidad principal.
 - [ ] Integrar los cambios aprobados en main.
 - [ ] Verificar funcionamiento desde un clon limpio.
 - [ ] Revisar evidencias del despliegue AWS.
-- [ ] Destruir recursos AWS despues de las pruebas.
+- [x] Destrucción de recursos tras el ensayo AWS del 26 de noviembre, documentada en el PR #74.
 - [ ] Crear el tag v1.0 sobre main validado.
 
 No crear el tag mientras existan bloqueos de entrega.

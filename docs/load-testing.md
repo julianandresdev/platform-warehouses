@@ -188,9 +188,7 @@ Los cinco escenarios fueron ejecutados manualmente.
 Las mediciones corresponden a solicitudes individuales,
 no a experimentos de carga concurrente.
 
-Los scripts oficiales D-06, las pruebas de retry/DLQ,
-la matriz de errores y las verificaciones adicionales
-de consumidores y auditoría siguen pendientes de validación.
+La evidencia posterior de D-06 cubre [Redis](evidencias/fase-10/caso-1.txt), [RabbitMQ](evidencias/fase-10/caso-2.txt), [recuperación del consumidor](evidencias/fase-10/caso-3.txt), [deduplicación en auditoría](evidencias/fase-10/caso-4.txt) y [detección y recuperación de una bodega sin heartbeat](evidencias/fase-10/caso-5.txt). La [matriz de F10](fases/fase-10.md#matriz-de-errores-para-revisión) reúne esos resultados y la cobertura de reintentos y DLQ de D-05. Los resultados de D-05 y D-06 proceden de las ejecuciones documentadas por sus autores.
 
 ## 3. Escenario 1: Redis ON/OFF
 
@@ -237,27 +235,52 @@ de consumidores y auditoría siguen pendientes de validación.
 
 ## 5. Escenario 3: Carga desigual entre bodegas
 
-- Escenario: distribución asimétrica de solicitudes.
-- Carga: 50, 800 y 20 usuarios respectivamente.
-- Arquitectura: tres bodegas independientes.
-- Métricas: RPS, P95, P99, CPU, memoria y errores.
-- Resultados: pendientes de J-09.
-- Cuello de botella: pendiente de medición.
-- Hipótesis: WH-002 requerirá mayor capacidad.
-- Evidencia: pendiente.
-- Mejora: escalamiento independiente por bodega.
+Tres instancias de Locust aplicaron 50, 800 y 20 usuarios a WH-001,
+WH-002 y WH-003 respectivamente durante 90 segundos. WH-002 tenía tres
+réplicas detrás de nginx.
+
+| Bodega | Usuarios | Req/s totales | Solicitudes | Fallos | P95 (ms) | P99 (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| WH-001 | 50 | 389,9 | 35.111 | 0 | 100 | 270 |
+| WH-002 | 800 | 1397,5 | 126.091 | 110.838 | 800 | 15.000 |
+| WH-003 | 20 | 180,6 | 16.259 | 0 | 30 | 120 |
+
+El 87,9 % de las solicitudes de WH-002 falló. Las otras dos bodegas
+siguieron atendiendo su carga sin errores, lo que respalda el aislamiento
+observado en este entorno. La principal prioridad de WH-002 es ajustar y
+medir la detección pasiva de nginx bajo carga y ante la caída de una réplica.
+
+Evidencia: [CSV, CPU, memoria y capturas de Grafana](evidencias/fase-11/multibodega/)
+y [análisis de J-09](evidencias/fase-11/README.md).
 
 ## 6. Escenario 4: Carga progresiva
 
-- Escenario: identificar el límite de capacidad.
-- Carga: 100, 500, 1000 y 5000 usuarios.
-- Arquitectura: plataforma distribuida y Locust.
-- Métricas: RPS, latencia, errores, CPU y memoria.
-- Resultados: pendientes de J-09.
-- Cuello de botella: pendiente de medición.
-- Hipótesis: la saturación puede ocurrir en API, BD o Locust.
-- Evidencia: pendiente.
-- Mejora: distribuir el generador de carga si se satura.
+Se aplicaron 100, 500, 1000 y 5000 usuarios a WH-002 con tres réplicas.
+Cada corrida de Locust duró 90 segundos y se recrearon las réplicas y
+nginx antes de cada escenario.
+
+| Usuarios | Req/s totales | Solicitudes | Fallos | P95 (ms) | P99 (ms) |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 100 | 880,3 | 79.262 | 0 | 46 | 200 |
+| 500 | 1462,9 | 131.727 | 106.225 | 390 | 15.000 |
+| 1000 | 3855,5 | 347.345 | 334.514 | 58 | 630 |
+| 5000 | 4919,1 | 432.810 | 429.315 | 1300 | 15.000 |
+
+El punto de quiebre observado está entre 100 y 500 usuarios con la
+configuración medida. Los RPS y percentiles agregados incluyen respuestas
+de error rápidas de nginx y deben interpretarse junto con los fallos.
+
+Un ensayo posterior a 500 usuarios obtuvo 167.190 solicitudes sin fallos
+al desactivar temporalmente el marcado pasivo de nginx, lo que identifica
+ese mecanismo como causa del colapso en esa corrida. A 5000 usuarios se
+observó además un atasco de la API. Con el límite de concurrencia del
+PR #80, las tres réplicas recuperaron `/health` a los 60 segundos en dos
+corridas. Ese resultado mide recuperación después de la sobrecarga.
+
+Evidencia: [resumen y CPU de Locust](evidencias/fase-11/resumen.md),
+[CSV y capturas por corrida](evidencias/fase-11/README.md) y
+[diagnóstico de nginx y recuperación](evidencias/fase-11/atasco-sobrecarga.md).
+Se ejecutó una corrida base por escenario en Docker local.
 
 ## 7. Pregunta final: 100 bodegas con cargas diferentes
 
@@ -283,10 +306,11 @@ pero no demuestran todavía capacidad para 100 bodegas.
 - Evidencias de las pruebas del 25 de noviembre adjuntas.
 - Recuperación de WH-003 verificada mediante Fan-out.
 - Discrepancia de CQRS diagnosticada y resuelta para P-001.
-- Resultados históricos de F2 y F5 consolidados.
-- Escenarios 3 y 4 pendientes de resultados oficiales J-09.
-- Pendientes: scripts D-06, matriz de errores, CSV de Locust,
-  y capturas de Grafana.
+- Resultados históricos de F2 y F5 consolidados. J-09 incluye comparaciones
+  nuevas con otra carga y configuración. Sus resultados se documentan en
+  el [resumen de F11](evidencias/fase-11/README.md).
+- Escenarios 3 y 4 integrados con tablas, CSV y capturas de Grafana de J-09.
+- Evidencia de los cinco scripts D-06 y matriz de errores de F10 enlazadas.
 - Transferencia completa y recuperación del destino verificadas por
   [identificador de correlación](evidencias/fase-11/traza-transferencia-saga.json).
 - Pendiente de revisión final de Julian.

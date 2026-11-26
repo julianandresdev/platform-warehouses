@@ -1,332 +1,152 @@
-# Preparacion de la defensa
+# Preparación de la defensa
 
-Guía de ensayo pendiente de revisión grupal. Los títulos y la numeración son provisionales hasta cotejarlos con el enunciado del profesor.
+Guía de ensayo alineada con el orden y los temas de la [sección 33 del enunciado del profesor](https://github.com/SebastianReyesLeyton/cloud-computing/blob/main/project/README.md#33-preguntas-de-defensa). Las preguntas se reformulan para el ensayo. Las respuestas y las evidencias corresponden a nuestra implementación y quedan para revisión grupal.
 
-## Índice
+## Arquitectura · 1 a 5
 
-- Arquitectura - Preguntas 1 a 5
-- Redis - Preguntas 6 a 10
-- RabbitMQ - Preguntas 11 a 15
-- Distribucion y CQRS - Preguntas 16 a 24
-- Cloud - Preguntas 25 a 29
-- Observabilidad - Preguntas 30 a 33
-- Pregunta final: Escalamiento a 100 bodegas
+### 1. ¿Por qué dar a cada bodega una base de datos propia?
 
-## Arquitectura - Preguntas 1 a 5
+Cada bodega confirma sus movimientos en su PostgreSQL. Así mantiene autonomía y puede dimensionar su almacenamiento por separado. La contrapartida es coordinar operaciones y consultas que cruzan bodegas. [Referencia](fases/fase-4.md)
 
-Responsable: Santiago.
+### 2. ¿Por qué evitar una sola base operacional para todas las bodegas?
 
-### 1. ¿Por qué separar la API de bodega y la central?
+Una base compartida simplificaría las consultas y transacciones globales, pero concentraría el tráfico y ampliaría el impacto de fallos y cambios de esquema. La base central conserva proyecciones y estados de transferencias. [Referencia](architecture.md)
 
-La bodega acepta escrituras locales y valida el stock. La central consolida lecturas y coordina transferencias. Separar ambos servicios permite operar una bodega sin invocar la central en cada movimiento. La vista global puede tener retraso. [Arquitectura](architecture.md)
+### 3. ¿Qué ve el usuario si una bodega queda inaccesible?
 
-### 2. ¿Qué datos deben persistir?
+Las bodegas sanas continúan operando. CQRS conserva el último dato y marca la bodega como `stale` tras el umbral de heartbeat de 90 segundos. Fan-out puede responder con un resultado parcial. [Referencia](fases/fase-7.md)
 
-PostgreSQL conserva productos, inventario y movimientos. También persiste el outbox para recuperar eventos después de un fallo. Redis puede reconstruir la caché a partir de PostgreSQL. [Fase 1](fases/fase-1.md) · [ADR de Outbox](adr/0006-patron-outbox.md)
+### 4. ¿Cómo aumentar capacidad solo en la bodega con más demanda?
 
-### 3. ¿Cómo se evita vender stock dos veces?
+Agregar réplicas de su API detrás de nginx y medir latencia, errores y saturación de PostgreSQL. En WH-002, las réplicas comparten PostgreSQL y Redis, por lo que un cuello de botella de datos requiere otro ajuste. La ganancia hay que medirla: en F5, una réplica dio 383 req/s y tres dieron 884 req/s, pero la réplica única ya devolvía 504. J-09, con 200 usuarios, no mostró diferencia (963 frente a 995 req/s) y Locust estaba cerca de saturar un núcleo. [Referencia](fases/fase-5.md)
 
-La operación bloquea la fila de inventario durante la transacción, comprueba la cantidad disponible y registra el movimiento junto al cambio de stock. Las salidas concurrentes sobre el mismo producto se serializan, lo que puede aumentar la espera en productos calientes. [ADR de concurrencia](adr/0004-control-de-concurrencia-en-movimientos.md)
+### 5. ¿Cómo se limita el impacto de un fallo local sobre las demás bodegas?
 
-### 4. ¿Por qué versionar el esquema SQL?
+Se aíslan API, base y caché por bodega. El outbox desacopla escrituras locales del broker y los timeouts acotan esperas remotas. Las pruebas de carga desigual mostraron cero errores en WH-001 y WH-003 durante el colapso de WH-002. [Referencia](load-testing.md)
 
-Las migraciones permiten reproducir la estructura y conservar restricciones explícitas. Generar tablas al iniciar la aplicación simplifica el prototipo, pero dificulta auditar cambios sobre bases existentes. [ADR de esquema](adr/0003-schema-sql-como-fuente-de-verdad.md)
+## Redis · 6 a 10
 
-### 5. ¿Qué gana el sistema con un balanceador?
+### 6. ¿Qué aporta Redis a las lecturas de inventario?
 
-Nginx distribuye las consultas de WH-002 y puede intentar otra réplica ante ciertos fallos. Las réplicas comparten almacenamiento, por lo que agregar API no elimina un cuello de botella en PostgreSQL. [ADR de Nginx](adr/0009-nginx-y-health-checks-pasivos.md)
+Cache Aside evita repetir consultas a PostgreSQL cuando varios clientes piden el mismo SKU. Redis reduce latencia y carga mientras PostgreSQL conserva el estado de referencia. En J-09, con la misma carga, Redis activado dio 785,7 req/s y P95 de 240 ms, frente a 468,9 req/s y 550 ms sin Redis. [Referencia](adr/0008-cache-aside-con-redis.md)
 
+### 7. ¿Cómo responde la API durante una caída de Redis?
 
-## Redis - Preguntas 6 a 10
+Lee directamente PostgreSQL y devuelve `X-Cache: BYPASS`. En la prueba F10 mantuvo HTTP 200 con mayor latencia. [Referencia](fases/fase-10.md)
 
-Responsable: Julian.
+### 8. ¿Cuándo y cómo se invalida una entrada de caché?
 
-### 6. ¿Por qué Cache Aside?
+La API invalida la entrada afectada después del commit. Una lectura concurrente puede repoblarla con una versión anterior, por lo que el TTL acota cuánto permanece esa entrada. [Referencia](adr/0008-cache-aside-con-redis.md)
 
-La aplicación consulta Redis primero. Ante un miss, lee PostgreSQL y almacena la respuesta con TTL. Esto ahorra consultas repetidas y permite operar sin Redis, a cambio de una ventana de obsolescencia. [ADR de Redis](adr/0008-cache-aside-con-redis.md)
+### 9. ¿Qué significa que una lectura tenga un cache miss?
 
-### 7. ¿En qué momento se invalida el inventario?
+Redis no tiene una entrada utilizable para la clave. La API consulta PostgreSQL y, si la caché está disponible, guarda la respuesta con TTL para lecturas posteriores. [Referencia](adr/0008-cache-aside-con-redis.md)
 
-Después del commit. Invalidar antes permitiría que una lectura repueble la caché con el stock previo al commit. Una lectura ya iniciada aún puede repoblarla tarde, con el TTL como límite. [ADR de Redis](adr/0008-cache-aside-con-redis.md)
+### 10. ¿Qué riesgo introduce una entrada obsoleta?
 
-### 8. ¿Para qué sirve el TTL?
+La lectura puede mostrar una cantidad diferente de la confirmada tras un movimiento. Las escrituras verifican existencias contra PostgreSQL dentro de una transacción y la invalidación con TTL reduce la ventana de discrepancia. El TTL documentado es de 30 segundos; uno más corto aumenta los misses y la carga en PostgreSQL. [Referencia](adr/0008-cache-aside-con-redis.md)
 
-Limita cuánto dura una entrada sin renovarse y acota el impacto si falla el borrado. Un TTL más corto aumenta misses y carga en PostgreSQL. El valor documentado es 30 segundos. [ADR de Redis](adr/0008-cache-aside-con-redis.md)
+## RabbitMQ · 11 a 15
 
-### 9. ¿Qué pasa si Redis falla?
+### 11. ¿Qué aporta un broker al intercambio de eventos?
 
-La API lee PostgreSQL y devuelve `X-Cache: BYPASS`. La prueba local de F10 observó HTTP 200 con más latencia durante la caída. [Evidencia F10 en E-07](https://github.com/julianandresdev/platform-warehouses/blob/7b84e133a8eb3c5b8d06c98298f7026723c07fa9/docs/fases/fase-10.md)
+RabbitMQ permite que central y workers consuman a su ritmo, con enrutamiento por evento o destino. El outbox retiene publicaciones pendientes si el broker está caído. A cambio aparecen colas, retrasos y duplicados posibles. [Referencia](adr/0005-topologia-rabbitmq.md)
 
-### 10. ¿Cómo se mide el aporte de la caché?
+### 12. ¿Cómo cambia el flujo entre procesamiento síncrono y asíncrono?
 
-Comparar Redis habilitado y deshabilitado con la misma carga. En F2 se registraron 1795,7 frente a 827,4 solicitudes por segundo y P95 de 52 frente a 130 ms. Son resultados del entorno de la prueba. [Resultados F2](evidencias/fase-2/resumen.md)
+En el síncrono el cliente espera el resultado de la operación. En el asíncrono se confirma la aceptación y un worker continúa el trabajo. La API puede confirmar el movimiento local antes de que la proyección central refleje el cambio. [Referencia](adr/0006-patron-outbox.md)
 
+### 13. ¿Qué ocurre con los mensajes si se detiene un worker?
 
-## RabbitMQ - Preguntas 11 a 15
+Los mensajes pendientes permanecen en la cola durable. Una entrega sin confirmación puede volver a entregarse. D-06 comprobó que la proyección retomó el procesamiento al recuperar el consumidor. [Referencia](evidencias/fase-10/caso-3.txt)
 
-Responsable: David.
+### 14. ¿Para qué sirve una Dead Letter Queue?
 
-### 11. ¿Por qué RabbitMQ y exchanges separados?
+Conserva mensajes que fallaron de forma permanente o agotaron sus reintentos, junto con información para diagnosticarlos. Así se puede inspeccionarlos o reprocesarlos sin bloquear el flujo principal. [Referencia](adr/0015-reintentos-dlq-idempotencia.md)
 
-Los exchanges de eventos permiten suscriptores independientes por clave. Los comandos se dirigen a una bodega. La comunicación asíncrona absorbe interrupciones cortas a cambio de colas, retraso y coordinación adicional. [ADR de RabbitMQ](adr/0005-topologia-rabbitmq.md)
+### 15. ¿Cómo se evita repetir efectos ante una entrega duplicada?
 
-### 12. ¿Qué problema resuelve Transactional Outbox?
+El consumidor registra el identificador del mensaje en la misma transacción que aplica el efecto. Si vuelve a llegar, confirma la entrega sin repetir el movimiento. La proyección también descarta versiones antiguas. [Referencia](adr/0020-idempotencia-comandos-bodega.md)
 
-El movimiento y la fila de outbox se confirman en la misma transacción. Un relay publica cuando el broker esté disponible. Se evita perder el evento entre el commit y el envío, con la posibilidad de republicación. [ADR de Outbox](adr/0006-patron-outbox.md)
+## Distribución · 16 a 20
 
-### 13. ¿Cómo se evita aplicar dos veces un comando?
+### 16. ¿Por qué la transferencia cruza límites transaccionales?
 
-El consumidor registra el identificador en la misma transacción que el efecto. Si ya existe, confirma la entrega sin repetir el movimiento. La proyección también protege el estado mediante versiones. [ADR de idempotencia](adr/0020-idempotencia-comandos-bodega.md)
+Reserva, envío y recepción afectan a dos PostgreSQL independientes. Cada bodega confirma sus cambios localmente y el orquestador coordina su avance mediante comandos y resultados. [Referencia](adr/0013-saga-orquestada.md)
 
-### 14. ¿Cuándo reintentar y cuándo enviar a DLQ?
+### 17. ¿En qué consiste una Saga y cómo se usa aquí?
 
-El plan reserva reintentos acotados para fallos transitorios y DLQ para errores permanentes o agotados. La validación de esa política pertenece a D-05. [ADR de reintentos](adr/0015-reintentos-dlq-idempotencia.md)
+Una Saga encadena transacciones locales y define compensaciones para fallos. El orquestador central persiste el estado, emite comandos y puede retomar el flujo después de reiniciar. [Referencia](adr/0013-saga-orquestada.md)
 
-### 15. ¿Qué pasa si el broker o el relay se detiene?
+### 18. ¿Cómo funciona una compensación en una transferencia?
 
-Los eventos ya confirmados quedan en el outbox. Al recuperar el componente, el relay reanuda el envío. La proyección global puede quedar temporalmente atrasada. [Evidencia F10 en E-07](https://github.com/julianandresdev/platform-warehouses/blob/7b84e133a8eb3c5b8d06c98298f7026723c07fa9/docs/fases/fase-10.md)
+Es una nueva operación de negocio que compensa un paso confirmado. Por ejemplo, si el destino rechaza la recepción después del envío, se ordena devolver inventario al origen con `RETURN_STOCK`. [Referencia](fases/fase-6.md)
 
+### 19. ¿Qué implica la consistencia eventual?
 
-## Distribucion y CQRS - Preguntas 16 a 24
+Entre el commit local y el procesamiento del evento, la vista central puede mostrar el estado anterior. Cuando se entregan y procesan los eventos pendientes, la proyección converge a la última versión de cada SKU y bodega. [Referencia](adr/0012-proyeccion-cqrs.md)
 
-Responsable: Esteban.
+### 20. ¿Qué hace la Saga si el destino guarda silencio tras el envío?
 
-Guía de ensayo basada en las fases F4 a F7. Los títulos y
-la numeración 16–24 son provisionales hasta cotejarlos
-con el enunciado del profesor.
+La transferencia queda `DESTINATION_PENDING`. La central alerta tras cinco minutos y puede completar al recibir la confirmación. Un rechazo definitivo habilita la compensación. Compensar solo por silencio podría duplicar unidades en tránsito. [Referencia](adr/0013-saga-orquestada.md)
 
-### 16. ¿Por que utilizar una base de datos por bodega?
+## CQRS · 21 a 24
 
-Una base compartida simplificaria las consultas globales,
-pero aumentaria el acoplamiento entre bodegas.
+### 21. ¿Para qué construir un modelo de lectura central?
 
-Decidimos utilizar PostgreSQL independiente por bodega
-para garantizar autonomia, aislamiento de datos y
-escalamiento independiente.
+Para consultar inventario consolidado con una sola lectura y separar el rendimiento de las consultas globales del de las escrituras operacionales de cada bodega. [Referencia](adr/0012-proyeccion-cqrs.md)
 
-La desventaja es que las consultas y transacciones
-globales requieren mecanismos distribuidos.
+### 22. ¿Qué costo tiene consultar todas las bodegas en cada solicitud?
 
-Ver [Fase 4](fases/fase-4.md) y el [Compose distribuido](../infrastructure/compose/compose.distributed.yml).
+Fan-out multiplica llamadas y la latencia depende de las APIs lentas o inaccesibles. En la prueba de F7, durante la operación normal CQRS obtuvo P95 de 200 ms frente a 580 ms de Fan-out, y 98,5 frente a 42,6 req/s. Con una bodega inaccesible, CQRS respondió 6.283 de 6.283 solicitudes y Fan-out solo 8 de 1.386 (0,58 %). [Referencia](fases/fase-7.md)
 
-### 17. ¿Como escalar bodegas con cargas diferentes?
+### 23. ¿Qué significa que el inventario de la vista global esté atrasado?
 
-No todas las bodegas reciben la misma cantidad de
-solicitudes. Escalarlas de manera uniforme desperdicia
-recursos.
+La central todavía muestra la última versión aplicada. El retraso de proyección mide la demora de procesamiento y el heartbeat indica actividad de la bodega. Una vista puede responder HTTP 200 mientras conserva datos anteriores. [Referencia](adr/0012-proyeccion-cqrs.md)
 
-Decidimos aumentar las replicas de API solamente en
-las bodegas que necesitan mayor capacidad.
+### 24. ¿Qué ventaja da proyectar el inventario a partir de eventos?
 
-Nginx distribuye las solicitudes entre las replicas
-de WH-002, que comparten su PostgreSQL y Redis.
+El worker actualiza las filas por SKU y bodega según la versión del evento. Así mantiene una representación optimizada para consultas globales sin cargar las bases operacionales y evita que un evento antiguo sobrescriba el dato actual. [Referencia](fases/fase-7.md)
 
-Esto permite aumentar la capacidad, aunque la base
-de datos puede convertirse en el nuevo cuello de botella.
+## Cloud · 25 a 29
 
-En F5 se registraron 382.98 solicitudes por segundo
-con una replica y 884.36 con tres replicas.
+### 25. ¿Qué papel cumple EC2 en el despliegue?
 
-Ver [comparación de rendimiento con Locust](evidencias/fase-5/comparacion-rendimiento.md).
+La instancia ejecuta los contenedores de la plataforma mediante Docker Compose. Permite reutilizar el empaquetado local y concentrar la operación del laboratorio en un host, con capacidad y disponibilidad ligadas a esa instancia. [Referencia](aws.md)
 
-### 18. ¿Por que utilizar Saga para las transferencias?
+### 26. ¿Cómo facilita ECR el despliegue de los contenedores?
 
-Una transferencia involucra dos bases de datos
-independientes y no dispone de una transaccion
-ACID global.
+ECR almacena las imágenes construidas para que EC2 las descargue con su identidad autorizada. Esto separa la construcción de la ejecución y permite desplegar versiones identificables. [Referencia](aws.md)
 
-Consideramos la coordinacion distribuida mediante
-transacciones globales y el patron Saga.
+### 27. ¿Qué cambia al usar RDS para PostgreSQL en lugar de un contenedor local?
 
-Elegimos Saga porque permite realizar transacciones
-locales y ejecutar operaciones compensatorias
-cuando ocurre un fallo.
+Ambos ofrecen PostgreSQL. En el laboratorio, RDS hospeda WH-001 como servicio administrado con su endpoint y reglas de acceso. En local, Compose arranca el contenedor y el equipo gestiona sus volúmenes e inicialización. [Referencia](aws.md)
 
-La desventaja es que existen estados intermedios
-y consistencia eventual.
+### 28. ¿Por qué guardar los reportes en S3?
 
-Ver [ADR-0013](adr/0013-saga-orquestada.md) y el [registro de integración de E-06](https://github.com/julianandresdev/platform-warehouses/blob/3888c2043a6909f6cf5323ddf26e2f1229aae838/docs/evidencias/fase-6/e06-integracion.md).
+S3 conserva reportes y metadatos como objetos independientes de EC2. El batch escribe un resumen diario y el evento de creación dispara la validación. MinIO permite probar el contrato de objetos en local. [Referencia](fases/fase-9.md)
 
-### 19. ¿Por que Saga orquestada y no coreografiada?
+### 29. ¿Cuándo encaja Lambda en el procesamiento de reportes?
 
-En una Saga coreografiada cada servicio reacciona
-a eventos y determina la siguiente operacion.
+Cuando un evento de S3 requiere una validación breve y acotada. El worker sirve para consumo continuo y el batch para agrupar trabajo por horario. Lambda evita mantener un proceso activo para cada espera entre reportes. [Referencia](fases/fase-9.md)
 
-En una Saga orquestada un coordinador central
-administra los estados y emite los comandos.
+## Observabilidad · 30 a 33
 
-Elegimos la segunda alternativa porque facilita
-la trazabilidad, los timeouts, las compensaciones
-y la recuperacion tras reinicios.
+### 30. ¿Cómo se rastrea una operación a través de varios servicios?
 
-La desventaja es la dependencia del coordinador
-para avanzar las transferencias.
+Propagar `X-Correlation-ID` desde el POST inicial hacia comandos, respuestas y logs. Buscar el mismo ID y verificar el estado final consultando el historial de la transferencia. [Referencia](evidencias/fase-11/traza-transferencia-saga.json)
 
-Ver [ADR-0013](adr/0013-saga-orquestada.md).
+### 31. ¿Qué campos permiten que un log sirva para diagnosticar un fallo?
 
-### 20. ¿Que sucede cuando falla una transferencia?
+Fecha y hora, nivel, servicio, bodega cuando corresponda, acción, identificador de correlación, resultado y duración. En un error se agrega su causa. Conviene evitar claves de API y credenciales. [Referencia](events.md)
 
-La respuesta depende del estado de la transferencia.
+### 32. ¿Cómo reconocer una cola que no alcanza a drenar?
 
-- Reserva rechazada: FAILED.
-- Reserva vencida despues de 30 segundos: FAILED.
-- Reserva confirmada tardia: RELEASE_RESERVATION.
-- Envío rechazado: `TRANSFER_SHIP_FAILED` lleva a `COMPENSATING` y se emite `RELEASE_RESERVATION`.
-- Recepción rechazada: se emite `RETURN_STOCK`.
-- Compensacion confirmada: CANCELLED.
-- Destino temporalmente caido: DESTINATION_PENDING.
+Observar si los mensajes listos crecen sostenidamente y si la tasa de entrada supera la de confirmación. Revisar entregas sin confirmar, número de consumidores, retraso y errores para distinguir acumulación de un consumidor atascado. [Referencia](fases/fase-11.md)
 
-No se cancela automaticamente una transferencia
-cuando la mercancia ya salio del origen, porque
-podria duplicarse el inventario.
+### 33. ¿Cómo acotar la causa de una consulta lenta?
 
-Despues de cinco minutos de espera se registra
-una alerta.
-
-El objetivo es conservar el inventario, incluyendo
-las unidades que se encuentran en transito.
-
-E-06 registró 46 pruebas unitarias y cinco escenarios de
-integración exitosos, incluidas las compensaciones por
-rechazo del destino y por fallo de envío inducido. El PR
-de E-06 contiene esa evidencia.
-
-Ver [resultados de F6 en E-06](https://github.com/julianandresdev/platform-warehouses/blob/3888c2043a6909f6cf5323ddf26e2f1229aae838/docs/fases/fase-6.md).
-
-### 21. ¿Que es CQRS y por que lo utilizamos?
-
-CQRS separa las operaciones de escritura de las
-consultas de lectura.
-
-Las bodegas conservan sus bases operacionales,
-mientras que la central mantiene un modelo de
-lectura con el inventario consolidado.
-
-RabbitMQ transporta los eventos y el worker
-de proyeccion actualiza PostgreSQL central.
-
-Esto reduce la dependencia de las APIs remotas
-y mejora la disponibilidad de las consultas.
-
-La desventaja es la consistencia eventual y
-la complejidad de mantener la proyeccion.
-
-Ver [ADR-0012](adr/0012-proyeccion-cqrs.md).
-
-### 22. ¿Como se mantiene actualizado el Read Model?
-
-Cada cambio de inventario produce un evento
-INVENTORY_UPDATED con su version correspondiente.
-
-El worker central realiza un UPSERT utilizando
-la llave compuesta SKU y warehouse_id.
-
-Solo se actualiza un registro si la version
-recibida es mayor que la version almacenada.
-
-Adicionalmente se utiliza processed_messages
-para controlar eventos duplicados.
-
-Esto evita que un mensaje antiguo sobrescriba
-informacion mas reciente.
-
-La proyeccion puede presentar retrasos, medidos
-mediante projection_lag_seconds.
-
-Ver [pruebas de versiones de la proyección](../tests/unit/test_projection_version.py) y [Fase 7](fases/fase-7.md).
-
-### 23. ¿Que ocurre si una bodega deja de responder?
-
-La central conserva el ultimo inventario conocido
-en su base de datos.
-
-Si una bodega permanece mas de 90 segundos sin
-enviar un heartbeat, se marca como stale.
-
-Esto permite continuar respondiendo consultas,
-pero advierte que los datos pueden estar
-desactualizados.
-
-Fan-out, en cambio, depende de las respuestas
-HTTP de las bodegas y puede devolver datos
-parciales o errores.
-
-Ver [experimento de caída en Fase 7](fases/fase-7.md) y [resultado CQRS](evidencias/fase-7/cqrs_fallo_stats.csv).
-
-### 24. ¿Que alternativa es mejor: Fan-out o CQRS?
-
-Fan-out consulta las APIs de las bodegas en paralelo.
-CQRS consulta el modelo consolidado de la central.
-
-En los experimentos locales de E-05 se obtuvieron:
-
-| Metrica | CQRS | Fan-out |
-| --- | ---: | ---: |
-| Latencia media normal | 93.75 ms | 349.88 ms |
-| P95 normal | 200 ms | 580 ms |
-| Solicitudes por segundo | 98.52 | 42.64 |
-| Solicitudes exitosas ante el fallo probado | 100% (6283 de 6283) | 0.58% (8 de 1386) |
-
-Elegimos CQRS como mecanismo predeterminado
-porque presento menor latencia y mayor disponibilidad
-bajo las condiciones evaluadas.
-
-Fan-out consulta directamente las bodegas, pero
-no garantiza un snapshot global atomico.
-
-CQRS sacrifica la actualidad inmediata de los
-datos a cambio de disponibilidad y desacoplamiento.
-
-Los resultados corresponden a pruebas locales
-y no son garantias de rendimiento en produccion.
-
-Ver [resultados de Fase 7](fases/fase-7.md) y [archivos del experimento](evidencias/fase-7/).
-
-## Cloud - Preguntas 25 a 29
-
-Responsable: Santiago.
-
-### 25. ¿Qué se gana con Terraform?
-
-Permite revisar el plan, reproducir la configuración y auditar qué recursos quedan al desmontar el entorno. Requiere gestionar el estado y contar con permisos y cuotas del laboratorio. [ADR de despliegue](adr/0018-despliegue-aws-learner-lab.md)
-
-### 26. ¿Cómo se distribuyen las funciones en AWS?
-
-El diseño asigna imágenes a ECR, ejecución de servicios a EC2, persistencia relacional a RDS y reportes a S3. Lambda se activa por eventos de objetos. La topología final necesita evidencia de S-09. [Arquitectura](architecture.md)
-
-### 27. ¿Por qué MinIO en local y S3 en AWS?
-
-MinIO permite probar el flujo de objetos desde Compose. S3 aporta la integración administrada con el entorno AWS. Los permisos y notificaciones se verifican aparte. [ADR de almacenamiento](adr/0011-minio-local-y-s3-en-aws.md)
-
-### 28. ¿Cuándo utilizar un worker, un batch o Lambda?
-
-El worker se mantiene disponible para consumo continuo. Batch agrupa trabajo con horario o volumen definido. Lambda procesa eventos breves y puede tener arranque en frío. Las mediciones de AWS deben respaldar una comparación de duración y costo. [ADR de Lambda](adr/0017-lambda-fuera-de-la-vpc.md)
-
-### 29. ¿Cómo se controla el costo de la práctica?
-
-Registrar la duración y los recursos por sesión, verificar el resultado del desmontaje y contrastarlo con la hoja de gasto. El costo total requiere datos de la sesión de AWS. [Despliegue AWS](aws.md)
-
-
-## Observabilidad - Preguntas 30 a 33
-
-Responsable: Julian.
-
-### 30. ¿Qué métricas se deben mirar durante una prueba de carga?
-
-RPS, P95/P99, errores, CPU, memoria y colas. En la vista global se añade el retraso de la proyección. Correlacionarlas permite ubicar el recurso saturado y distinguirlo de un generador de carga saturado. [Fase 11](fases/fase-11.md)
-
-### 31. ¿Cómo se sigue una transferencia?
-
-Propagar el identificador de correlación desde el POST inicial a los comandos, respuestas y logs. El historial de la API verifica el orden y el estado final. [Traza del PR de E-07](https://github.com/julianandresdev/platform-warehouses/blob/7b84e133a8eb3c5b8d06c98298f7026723c07fa9/docs/evidencias/fase-11/traza-transferencia-saga.json)
-
-### 32. ¿Qué indica el retraso de proyección?
-
-Mide cuánto tarda un evento en quedar reflejado en el modelo de lectura. El heartbeat mide si la bodega sigue reportando actividad. Una vista puede responder y arrastrar retraso aunque su HTTP sea exitoso. [ADR de CQRS](adr/0012-proyeccion-cqrs.md)
-
-### 33. ¿Qué aporta Grafana a un diagnóstico?
-
-Relacionar series de latencia, errores, CPU y colas en el mismo intervalo. Los logs sirven luego para explicar una operación concreta. Los dashboards definitivos deben verificarse durante una corrida real. [ADR de observabilidad](adr/0016-prometheus-y-grafana.md)
-
+Identificar el endpoint por P95/P99 y buscar una solicitud lenta por correlación. Comparar tiempo de API, caché, pool y carga de PostgreSQL. Si la demora está en SQL, revisar su plan con `EXPLAIN` y comprobar índices, filas y bloqueos. [Referencia](fases/fase-11.md)
 
 ## Pregunta final: Escalamiento a 100 bodegas
 
@@ -393,6 +213,25 @@ con estados persistentes, idempotencia y compensaciones.
 Los resultados corresponden a experimentos locales
 realizados bajo condiciones especificas.
 
+Las filas de F2 y F5 son las corridas históricas de cada fase. J-09
+repitió esas comparaciones con otra carga y configuración, y sus
+cifras no coinciden con las de la tabla:
+
+| Experimento J-09 | Sin la mejora | Con la mejora |
+| --- | ---: | ---: |
+| Redis, RPS | 468.9 sin Redis | 785.7 con Redis |
+| Redis, P95 | 550 ms sin Redis | 240 ms con Redis |
+| WH-002, RPS | 963.0 con 1 instancia | 995.1 con 3 instancias |
+| WH-002, P95 | 240 ms con 1 instancia | 320 ms con 3 instancias |
+
+La mejora de Redis se confirma. La de pasar de una a tres réplicas no
+se reproduce en J-09: con 200 usuarios no hubo diferencia y Locust
+pudo limitar el resultado, y la corrida histórica de F5 partía de una
+réplica que ya devolvía 504. Al citar F5 en la defensa, indicar esas
+condiciones. Detalle en
+[load-testing.md](load-testing.md) y
+[evidencias/fase-11/README.md](evidencias/fase-11/README.md).
+
 ### Trade-offs
 
 - Mayor complejidad operativa.
@@ -421,8 +260,7 @@ cache, escalamiento horizontal y CQRS.
 Sin embargo, no demuestran capacidad real para operar
 100 bodegas simultaneamente.
 
-Se requieren pruebas de carga desigual, carga progresiva,
-saturacion del broker, recuperacion y despliegue completo.
+J-09 aporta pruebas de carga desigual y progresiva en tres bodegas. Para validar 100 bodegas quedan por medir la saturación del broker, el crecimiento de la proyección y la recuperación a esa escala.
 
 ### Conclusion
 
@@ -442,6 +280,3 @@ obtenidas y no mediante una cantidad fija de replicas.
 - docs/evidencias/fase-5/
 - docs/adr/0012-proyeccion-cqrs.md
 - docs/adr/0013-saga-orquestada.md
-
-Las evidencias de otras ramas deben quedar disponibles
-en main despues de su integracion.
